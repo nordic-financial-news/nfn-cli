@@ -1,0 +1,48 @@
+version: 2
+
+builds:
+  - main: ./cmd/nfn
+    binary: nfn
+    ldflags:
+      - -s -w
+      - -X github.com/nordic-financial-news/nfn-cli/internal/cmd.Version={{.Version}}
+      - -X github.com/nordic-financial-news/nfn-cli/internal/cmd.Commit={{.Commit}}
+      - -X github.com/nordic-financial-news/nfn-cli/internal/cmd.Date={{.Date}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+brews:
+  - name: nfn
+    repository:
+      owner: nordic-financial-news
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/nordic-financial-news/nfn-cli
+    description: CLI for the Nordic Financial News API
+    license: MIT
+    install: |
+      bin.install "nfn"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

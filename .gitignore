@@ -1,0 +1,9 @@
+/nfn
+dist/
+LAUNCH.md
+.DS_Store
+.claude/
+CLAUDE.md
+.env
+.env.*
+*.log
