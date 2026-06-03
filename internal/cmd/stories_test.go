@@ -37,8 +37,8 @@ func TestBuildStoryParams(t *testing.T) {
 		},
 		{
 			name:   "watchlist-id maps to watchlist",
-			flags:  map[string]string{"watchlist-id": "wl_8fk2a1b3c4d5"},
-			wantKV: map[string]string{"watchlist": "wl_8fk2a1b3c4d5"},
+			flags:  map[string]string{"watchlist-id": "a1b2c3d4e5f6"},
+			wantKV: map[string]string{"watchlist": "a1b2c3d4e5f6"},
 		},
 		{
 			name:   "limit int",

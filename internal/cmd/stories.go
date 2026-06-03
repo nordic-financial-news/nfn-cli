@@ -23,7 +23,7 @@ var storiesListCmd = &cobra.Command{
   nfn stories list --ticker VOLV-B
   nfn stories list --sources abc123,def456
   nfn stories list --listed
-  nfn stories list --watchlist-id wl_8fk2a1b3c4d5
+  nfn stories list --watchlist-id a1b2c3d4e5f6
   nfn stories list --all --format json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)

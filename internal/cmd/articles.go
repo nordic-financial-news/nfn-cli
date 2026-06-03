@@ -24,7 +24,7 @@ var articlesListCmd = &cobra.Command{
   nfn articles list --q "battery" --limit 10
   nfn articles list --sources abc123,def456
   nfn articles list --listed
-  nfn articles list --watchlist-id wl_8fk2a1b3c4d5
+  nfn articles list --watchlist-id a1b2c3d4e5f6
   nfn articles list --all --format json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
