@@ -86,7 +86,8 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 		{Description: "View watchlist details", Command: "nfn watchlists get <id>"},
 	},
 	"nfn watchlists get": {
-		{Description: "List watchlist articles", Command: "nfn articles list --watchlist"},
+		{Description: "List articles for this watchlist", Command: "nfn articles list --watchlist-id <id>"},
+		{Description: "List stories for this watchlist", Command: "nfn stories list --watchlist-id <id>"},
 		{Description: "List watchlists", Command: "nfn watchlists list"},
 	},
 	"nfn doctor": {

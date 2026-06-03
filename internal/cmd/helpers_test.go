@@ -1,8 +1,55 @@
 package cmd
 
 import (
+	"errors"
+	"strings"
 	"testing"
+
+	"github.com/nordic-financial-news/nfn-cli/internal/api"
 )
+
+func TestWatchlistFilterError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("403 with watchlist filter becomes scope message", func(t *testing.T) {
+		t.Parallel()
+		got := watchlistFilterError(&api.APIError{StatusCode: 403, Detail: "Forbidden"}, "wl_abc")
+		if got == nil || !strings.Contains(got.Error(), "read:watchlist scope") {
+			t.Errorf("expected read:watchlist scope message, got %v", got)
+		}
+	})
+
+	t.Run("403 without watchlist filter passes through", func(t *testing.T) {
+		t.Parallel()
+		orig := &api.APIError{StatusCode: 403, Detail: "Forbidden"}
+		if got := watchlistFilterError(orig, ""); got != orig {
+			t.Errorf("expected original error to pass through, got %v", got)
+		}
+	})
+
+	t.Run("non-403 API error passes through", func(t *testing.T) {
+		t.Parallel()
+		orig := &api.APIError{StatusCode: 500, Detail: "boom"}
+		if got := watchlistFilterError(orig, "wl_abc"); got != orig {
+			t.Errorf("expected original error to pass through, got %v", got)
+		}
+	})
+
+	t.Run("plain error passes through", func(t *testing.T) {
+		t.Parallel()
+		orig := errors.New("network down")
+		if got := watchlistFilterError(orig, "wl_abc"); got != orig {
+			t.Errorf("expected original error to pass through, got %v", got)
+		}
+	})
+
+	t.Run("nil error stays nil", func(t *testing.T) {
+		t.Parallel()
+		if got := watchlistFilterError(nil, "wl_abc"); got != nil {
+			t.Errorf("expected nil, got %v", got)
+		}
+	})
+}
 
 func TestIsTrustedHost(t *testing.T) {
 	t.Parallel()

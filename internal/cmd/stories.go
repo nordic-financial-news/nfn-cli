@@ -23,26 +23,27 @@ var storiesListCmd = &cobra.Command{
   nfn stories list --ticker VOLV-B
   nfn stories list --sources abc123,def456
   nfn stories list --listed
-  nfn stories list --watchlist
+  nfn stories list --watchlist-id wl_8fk2a1b3c4d5
   nfn stories list --all --format json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
 		params := buildStoryParams(cmd)
+		watchlistID, _ := cmd.Flags().GetString("watchlist-id")
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
 			stories, _, err := client.ListAllStories(cmd.Context(), params)
 			if err != nil {
-				return err
+				return watchlistFilterError(err, watchlistID)
 			}
 			return renderStories(f, stories, nil)
 		}
 
 		stories, pagination, _, err := client.ListStories(cmd.Context(), params)
 		if err != nil {
-			return err
+			return watchlistFilterError(err, watchlistID)
 		}
 		return renderStories(f, stories, pagination)
 	},
@@ -117,8 +118,8 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetBool("listed"); v {
 		params.Set("listed", "true")
 	}
-	if v, _ := cmd.Flags().GetBool("watchlist"); v {
-		params.Set("watchlist", "true")
+	if v, _ := cmd.Flags().GetString("watchlist-id"); v != "" {
+		params.Set("watchlist", v)
 	}
 	if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
 		params.Set("limit", fmt.Sprintf("%d", v))
@@ -161,7 +162,7 @@ func init() {
 	storiesListCmd.Flags().String("ticker", "", "Filter by company ticker")
 	storiesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
 	storiesListCmd.Flags().Bool("listed", false, "Only show stories about listed companies")
-	storiesListCmd.Flags().Bool("watchlist", false, "Only show stories about watchlisted companies")
+	storiesListCmd.Flags().String("watchlist-id", "", "Only show stories for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(storiesListCmd)
 	addFieldsFlag(storiesListCmd)
 

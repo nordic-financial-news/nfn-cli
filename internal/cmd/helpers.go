@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -54,6 +55,22 @@ func apiClientFromContext(cmd *cobra.Command) *api.Client {
 
 func formatterFromContext(cmd *cobra.Command) *output.Formatter {
 	return cmd.Context().Value(formatterKey).(*output.Formatter)
+}
+
+// watchlistFilterError clarifies the error from a list request when a watchlist
+// filter was applied. A watchlist-filtered request returns 403 when the API key
+// lacks the read:watchlist scope; surface that as an actionable message. When no
+// watchlist filter was used (watchlistID == "") or the error is unrelated, the
+// original error passes through unchanged.
+func watchlistFilterError(err error, watchlistID string) error {
+	if err == nil || watchlistID == "" {
+		return err
+	}
+	var apiErr *api.APIError
+	if errors.As(err, &apiErr) && apiErr.IsForbidden() {
+		return fmt.Errorf("watchlist filtering requires the read:watchlist scope on your API key (the API returned 403 Forbidden)")
+	}
+	return err
 }
 
 func addPaginationFlags(cmd *cobra.Command) {

@@ -25,6 +25,10 @@ func (e *APIError) IsUnauthorized() bool {
 	return e.StatusCode == 401
 }
 
+func (e *APIError) IsForbidden() bool {
+	return e.StatusCode == 403
+}
+
 func (e *APIError) IsRateLimited() bool {
 	return e.StatusCode == 429
 }

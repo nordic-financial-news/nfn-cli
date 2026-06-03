@@ -78,6 +78,11 @@ func TestBuildArticleParams(t *testing.T) {
 			wantKV: map[string]string{"sources": "id1,id2"},
 		},
 		{
+			name:   "watchlist-id maps to watchlist",
+			flags:  map[string]string{"watchlist-id": "wl_8fk2a1b3c4d5"},
+			wantKV: map[string]string{"watchlist": "wl_8fk2a1b3c4d5"},
+		},
+		{
 			name: "multiple flags combined",
 			flags: map[string]string{
 				"country":  "NO",
@@ -112,7 +117,7 @@ func TestBuildArticleParams(t *testing.T) {
 			cmd.Flags().String("ids", "", "")
 			cmd.Flags().String("sources", "", "")
 			cmd.Flags().Bool("listed", false, "")
-			cmd.Flags().Bool("watchlist", false, "")
+			cmd.Flags().String("watchlist-id", "", "")
 			cmd.Flags().Int("limit", 0, "")
 			cmd.Flags().String("cursor", "", "")
 			cmd.Flags().String("fields", "", "")

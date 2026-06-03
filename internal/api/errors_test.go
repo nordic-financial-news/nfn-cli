@@ -61,6 +61,26 @@ func TestAPIError_IsUnauthorized(t *testing.T) {
 	}
 }
 
+func TestAPIError_IsForbidden(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		code int
+		want bool
+	}{
+		{403, true},
+		{401, false},
+		{200, false},
+		{429, false},
+	}
+
+	for _, tt := range tests {
+		e := &APIError{StatusCode: tt.code}
+		if got := e.IsForbidden(); got != tt.want {
+			t.Errorf("IsForbidden() for %d = %v, want %v", tt.code, got, tt.want)
+		}
+	}
+}
+
 func TestAPIError_IsRateLimited(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

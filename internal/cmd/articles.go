@@ -24,26 +24,27 @@ var articlesListCmd = &cobra.Command{
   nfn articles list --q "battery" --limit 10
   nfn articles list --sources abc123,def456
   nfn articles list --listed
-  nfn articles list --watchlist
+  nfn articles list --watchlist-id wl_8fk2a1b3c4d5
   nfn articles list --all --format json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
 		params := buildArticleParams(cmd)
+		watchlistID, _ := cmd.Flags().GetString("watchlist-id")
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
 			articles, _, err := client.ListAllArticles(cmd.Context(), params)
 			if err != nil {
-				return err
+				return watchlistFilterError(err, watchlistID)
 			}
 			return renderArticles(f, articles, nil)
 		}
 
 		articles, pagination, _, err := client.ListArticles(cmd.Context(), params)
 		if err != nil {
-			return err
+			return watchlistFilterError(err, watchlistID)
 		}
 		return renderArticles(f, articles, pagination)
 	},
@@ -144,8 +145,8 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetBool("listed"); v {
 		params.Set("listed", "true")
 	}
-	if v, _ := cmd.Flags().GetBool("watchlist"); v {
-		params.Set("watchlist", "true")
+	if v, _ := cmd.Flags().GetString("watchlist-id"); v != "" {
+		params.Set("watchlist", v)
 	}
 	if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
 		params.Set("limit", fmt.Sprintf("%d", v))
@@ -206,7 +207,7 @@ func init() {
 	articlesListCmd.Flags().String("ids", "", "Comma-separated article IDs")
 	articlesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
 	articlesListCmd.Flags().Bool("listed", false, "Only show articles about listed companies")
-	articlesListCmd.Flags().Bool("watchlist", false, "Only show articles about watchlisted companies")
+	articlesListCmd.Flags().String("watchlist-id", "", "Only show articles for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(articlesListCmd)
 	addFieldsFlag(articlesListCmd)
 

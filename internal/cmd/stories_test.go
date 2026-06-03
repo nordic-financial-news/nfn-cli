@@ -36,6 +36,11 @@ func TestBuildStoryParams(t *testing.T) {
 			wantKV: map[string]string{"listed": "true"},
 		},
 		{
+			name:   "watchlist-id maps to watchlist",
+			flags:  map[string]string{"watchlist-id": "wl_8fk2a1b3c4d5"},
+			wantKV: map[string]string{"watchlist": "wl_8fk2a1b3c4d5"},
+		},
+		{
 			name:   "limit int",
 			ints:   map[string]int{"limit": 25},
 			wantKV: map[string]string{"limit": "25"},
@@ -53,7 +58,7 @@ func TestBuildStoryParams(t *testing.T) {
 			cmd.Flags().String("ticker", "", "")
 			cmd.Flags().String("sources", "", "")
 			cmd.Flags().Bool("listed", false, "")
-			cmd.Flags().Bool("watchlist", false, "")
+			cmd.Flags().String("watchlist-id", "", "")
 			cmd.Flags().Int("limit", 0, "")
 			cmd.Flags().String("cursor", "", "")
 			cmd.Flags().String("fields", "", "")

@@ -134,7 +134,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by date range | `nfn articles list --published-after 2025-01-01 --published-before 2025-06-01` |
 | Search articles by text | `nfn articles list --q "battery"` |
 | Only listed companies | `nfn articles list --listed` |
-| Only watchlisted companies | `nfn articles list --watchlist` |
+| Filter by watchlist | `nfn articles list --watchlist-id <id>` |
 | Filter by content type | `nfn articles list --content-type "press release"` |
 | Fetch specific IDs | `nfn articles list --ids "id1,id2,id3" --format json` |
 | Incremental sync | `nfn articles list --updated-after "2025-03-01T00:00:00Z" --all --format json` |
@@ -146,7 +146,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter stories by ticker | `nfn stories list --ticker VOLV-B` |
 | Filter stories by source | `nfn stories list --sources <id1,id2>` |
 | Only listed companies | `nfn stories list --listed` |
-| Only watchlisted companies | `nfn stories list --watchlist` |
+| Filter by watchlist | `nfn stories list --watchlist-id <id>` |
 | Get story details | `nfn stories get <id> --format json` |
 | **Companies** | |
 | List companies | `nfn companies list --format json` |
@@ -212,7 +212,8 @@ Looking for news?
 │   └── then → nfn articles list --category "Economic Policy"
 ├── Want stories (clustered articles)? → nfn stories list
 ├── Only about listed companies? → nfn articles list --listed
-├── Only about watchlisted companies? → nfn articles list --watchlist
+├── Only about companies in a watchlist? → nfn watchlists list (to see IDs)
+│   └── then → nfn articles list --watchlist-id <id>
 ├── Have an article ID? → nfn articles get <id>
 └── Not sure what's available? → nfn search "query"
 ```
