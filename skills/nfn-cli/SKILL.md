@@ -93,11 +93,11 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 7. **Breadcrumbs suggest next commands** — the `breadcrumbs` array in JSON output suggests logical follow-up commands. Use these to navigate the data model (e.g., from a company to its articles).
 
-8. **Country codes are ISO2** — use `SE` for Sweden, `DK` for Denmark, `FI` for Finland, `NO` for Norway, `IS` for Iceland. Run `nfn countries list` if unsure.
+8. **Country codes are ISO2** — use `SE` for Sweden, `DK` for Denmark, `FI` for Finland, `NO` for Norway, `IS` for Iceland. Run `nfn countries list` if unsure. The `--country` filter accepts a comma-separated list to combine countries, e.g. `--country SE,NO,FI`.
 
 9. **Exchange codes are MIC codes** — use `XSTO` for Stockholm, `XCSE` for Copenhagen, `XHEL` for Helsinki, `XOSL` for Oslo. Run `nfn exchanges list` if unsure.
 
-10. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available.
+10. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones).
 
 ### Output Modes
 
@@ -129,9 +129,13 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 |------|---------|
 | **Articles** | |
 | List articles | `nfn articles list --format json` |
-| Filter by country | `nfn articles list --country SE` |
+| Filter by country | `nfn articles list --country SE,NO` |
 | Filter by category | `nfn articles list --category "Economic Policy"` |
 | Filter by ticker | `nfn articles list --ticker VOLV-B` |
+| Filter by company ID | `nfn articles list --company <id>` |
+| Filter by exchange | `nfn articles list --exchange XSTO` |
+| Filter by index | `nfn articles list --index OMXS30` |
+| Filter by sector | `nfn articles list --sector Industrials` |
 | Filter by source | `nfn articles list --sources <id1,id2>` |
 | Filter by date range | `nfn articles list --published-after 2025-01-01 --published-before 2025-06-01` |
 | Search articles by text | `nfn articles list --q "battery"` |
@@ -143,9 +147,13 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Get article details | `nfn articles get <id> --format json` |
 | **Stories** | |
 | List stories | `nfn stories list --format json` |
-| Filter stories by country | `nfn stories list --country SE` |
+| Filter stories by country | `nfn stories list --country SE,NO` |
 | Filter stories by category | `nfn stories list --category "Mergers & Acquisitions"` |
 | Filter stories by ticker | `nfn stories list --ticker VOLV-B` |
+| Filter stories by company ID | `nfn stories list --company <id>` |
+| Filter stories by exchange | `nfn stories list --exchange XSTO` |
+| Filter stories by index | `nfn stories list --index OMXS30` |
+| Filter stories by sector | `nfn stories list --sector Industrials` |
 | Filter stories by source | `nfn stories list --sources <id1,id2>` |
 | Only listed companies | `nfn stories list --listed` |
 | Filter by watchlist | `nfn stories list --watchlist-id <id>` |
@@ -153,9 +161,10 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | **Calendar** | |
 | List calendar events | `nfn calendar list --format json` |
 | Filter by ticker | `nfn calendar list --ticker VOLV-B` |
+| Filter by company ID | `nfn calendar list --company <id>` |
 | Filter by event type | `nfn calendar list --event-type earnings_report,dividend` |
 | Filter by date range | `nfn calendar list --scheduled-after 2026-01-01 --scheduled-before 2026-06-30` |
-| Filter by country | `nfn calendar list --country SE` |
+| Filter by country | `nfn calendar list --country SE,NO` |
 | Filter by watchlist | `nfn calendar list --watchlist-id <id>` |
 | Get calendar event details | `nfn calendar get <id> --format json` |
 | **Companies** | |

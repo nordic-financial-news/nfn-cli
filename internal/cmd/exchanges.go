@@ -159,7 +159,7 @@ func renderExchanges(f *output.Formatter, exchanges []api.ExchangeDetail, pagina
 }
 
 func init() {
-	exchangesListCmd.Flags().String("country", "", "Filter by country ISO2 code (e.g. SE)")
+	exchangesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	exchangesListCmd.Flags().Int("limit", 0, "Maximum number of results per page")
 	exchangesListCmd.Flags().String("cursor", "", "Pagination cursor")
 	addFieldsFlag(exchangesListCmd)

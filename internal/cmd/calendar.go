@@ -19,6 +19,7 @@ var calendarListCmd = &cobra.Command{
 	Short: "List calendar events",
 	Example: `  nfn calendar list --limit 10
   nfn calendar list --ticker VOLV-B
+  nfn calendar list --company cmpny1234567
   nfn calendar list --event-type earnings_report,dividend
   nfn calendar list --country SE,NO --scheduled-before 2026-12-31
   nfn calendar list --watchlist-id a1b2c3d4e5f6
@@ -104,6 +105,9 @@ func buildCalendarParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("ticker"); v != "" {
 		params.Set("ticker", v)
 	}
+	if v, _ := cmd.Flags().GetString("company"); v != "" {
+		params.Set("company", v)
+	}
 	if v, _ := cmd.Flags().GetString("country"); v != "" {
 		params.Set("country", v)
 	}
@@ -185,10 +189,11 @@ func eventDate(e api.CalendarEvent) string {
 
 func init() {
 	calendarListCmd.Flags().String("ticker", "", "Filter by company ticker")
+	calendarListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
 	calendarListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2)")
-	calendarListCmd.Flags().String("exchange", "", "Filter by exchange MIC code")
-	calendarListCmd.Flags().String("index", "", "Filter by stock index symbol")
-	calendarListCmd.Flags().String("sector", "", "Filter by company sector")
+	calendarListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	calendarListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
+	calendarListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	calendarListCmd.Flags().String("event-type", "", "Filter by event type (comma-separated, e.g. earnings_report,dividend)")
 	calendarListCmd.Flags().String("status", "", "Filter by status (scheduled, published, cancelled)")
 	calendarListCmd.Flags().String("scheduled-after", "", "Only events scheduled on or after this date (ISO 8601)")

@@ -334,7 +334,7 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 
 func init() {
 	companiesListCmd.Flags().String("q", "", "Search company names and aliases")
-	companiesListCmd.Flags().String("country", "", "Filter by country code (e.g. SE)")
+	companiesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	companiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
 	companiesListCmd.Flags().String("sector", "", "Filter by sector (e.g. Financials)")
 	companiesListCmd.Flags().Bool("listed", false, "Only show listed companies")

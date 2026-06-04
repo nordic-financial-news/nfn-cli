@@ -28,6 +28,11 @@ func TestBuildCalendarParams(t *testing.T) {
 			wantKV: map[string]string{"ticker": "VOLV-B"},
 		},
 		{
+			name:   "company flag",
+			flags:  map[string]string{"company": "cmpny1234567"},
+			wantKV: map[string]string{"company": "cmpny1234567"},
+		},
+		{
 			name:   "event-type maps to event_type",
 			flags:  map[string]string{"event-type": "earnings_report,dividend"},
 			wantKV: map[string]string{"event_type": "earnings_report,dividend"},
@@ -71,6 +76,7 @@ func TestBuildCalendarParams(t *testing.T) {
 			cmd := *calendarListCmd
 			cmd.ResetFlags()
 			cmd.Flags().String("ticker", "", "")
+			cmd.Flags().String("company", "", "")
 			cmd.Flags().String("country", "", "")
 			cmd.Flags().String("exchange", "", "")
 			cmd.Flags().String("index", "", "")

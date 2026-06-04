@@ -83,6 +83,21 @@ func TestBuildArticleParams(t *testing.T) {
 			wantKV: map[string]string{"watchlist": "a1b2c3d4e5f6"},
 		},
 		{
+			name:   "country accepts comma-separated list",
+			flags:  map[string]string{"country": "SE,NO"},
+			wantKV: map[string]string{"country": "SE,NO"},
+		},
+		{
+			name:   "company flag",
+			flags:  map[string]string{"company": "cmpny1234567"},
+			wantKV: map[string]string{"company": "cmpny1234567"},
+		},
+		{
+			name:   "exchange, index, sector filters",
+			flags:  map[string]string{"exchange": "XSTO", "index": "OMXS30", "sector": "Industrials"},
+			wantKV: map[string]string{"exchange": "XSTO", "index": "OMXS30", "sector": "Industrials"},
+		},
+		{
 			name: "multiple flags combined",
 			flags: map[string]string{
 				"country":  "NO",
@@ -109,6 +124,10 @@ func TestBuildArticleParams(t *testing.T) {
 			cmd.Flags().String("country", "", "")
 			cmd.Flags().String("category", "", "")
 			cmd.Flags().String("ticker", "", "")
+			cmd.Flags().String("company", "", "")
+			cmd.Flags().String("exchange", "", "")
+			cmd.Flags().String("index", "", "")
+			cmd.Flags().String("sector", "", "")
 			cmd.Flags().String("content-type", "", "")
 			cmd.Flags().String("published-after", "", "")
 			cmd.Flags().String("published-before", "", "")

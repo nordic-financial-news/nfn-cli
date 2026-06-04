@@ -19,8 +19,11 @@ var articlesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List articles",
 	Example: `  nfn articles list --limit 5
-  nfn articles list --country SE --category "Economic Policy"
+  nfn articles list --country SE,NO --category "Economic Policy"
   nfn articles list --ticker VOLV-B --published-after 2025-01-01
+  nfn articles list --company cmpny1234567
+  nfn articles list --exchange XSTO --sector Industrials
+  nfn articles list --index OMXS30
   nfn articles list --q "battery" --limit 10
   nfn articles list --sources abc123,def456
   nfn articles list --listed
@@ -121,6 +124,18 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("ticker"); v != "" {
 		params.Set("ticker", v)
 	}
+	if v, _ := cmd.Flags().GetString("company"); v != "" {
+		params.Set("company", v)
+	}
+	if v, _ := cmd.Flags().GetString("exchange"); v != "" {
+		params.Set("exchange", v)
+	}
+	if v, _ := cmd.Flags().GetString("index"); v != "" {
+		params.Set("index", v)
+	}
+	if v, _ := cmd.Flags().GetString("sector"); v != "" {
+		params.Set("sector", v)
+	}
 	if v, _ := cmd.Flags().GetString("content-type"); v != "" {
 		params.Set("content_type", v)
 	}
@@ -196,9 +211,13 @@ func truncate(s string, max int) string {
 }
 
 func init() {
-	articlesListCmd.Flags().String("country", "", "Filter by country code")
+	articlesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	articlesListCmd.Flags().String("category", "", "Filter by category")
 	articlesListCmd.Flags().String("ticker", "", "Filter by company ticker")
+	articlesListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
+	articlesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	articlesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
+	articlesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	articlesListCmd.Flags().String("content-type", "", "Filter by content type")
 	articlesListCmd.Flags().String("published-after", "", "Filter by published after date")
 	articlesListCmd.Flags().String("published-before", "", "Filter by published before date")

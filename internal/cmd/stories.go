@@ -19,8 +19,11 @@ var storiesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List stories",
 	Example: `  nfn stories list --limit 5
-  nfn stories list --country SE --category "Economic Policy"
+  nfn stories list --country SE,NO --category "Economic Policy"
   nfn stories list --ticker VOLV-B
+  nfn stories list --company cmpny1234567
+  nfn stories list --exchange XSTO --sector Industrials
+  nfn stories list --index OMXS30
   nfn stories list --sources abc123,def456
   nfn stories list --listed
   nfn stories list --watchlist-id a1b2c3d4e5f6
@@ -112,6 +115,18 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("ticker"); v != "" {
 		params.Set("ticker", v)
 	}
+	if v, _ := cmd.Flags().GetString("company"); v != "" {
+		params.Set("company", v)
+	}
+	if v, _ := cmd.Flags().GetString("exchange"); v != "" {
+		params.Set("exchange", v)
+	}
+	if v, _ := cmd.Flags().GetString("index"); v != "" {
+		params.Set("index", v)
+	}
+	if v, _ := cmd.Flags().GetString("sector"); v != "" {
+		params.Set("sector", v)
+	}
 	if v, _ := cmd.Flags().GetString("sources"); v != "" {
 		params.Set("sources", v)
 	}
@@ -157,9 +172,13 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 }
 
 func init() {
-	storiesListCmd.Flags().String("country", "", "Filter by country code")
+	storiesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	storiesListCmd.Flags().String("category", "", "Filter by category")
 	storiesListCmd.Flags().String("ticker", "", "Filter by company ticker")
+	storiesListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
+	storiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	storiesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
+	storiesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	storiesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
 	storiesListCmd.Flags().Bool("listed", false, "Only show stories about listed companies")
 	storiesListCmd.Flags().String("watchlist-id", "", "Only show stories for companies in this watchlist (see 'nfn watchlists list')")
