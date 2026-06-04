@@ -44,6 +44,8 @@ nfn articles list --limit 5
 | `nfn articles get <id>` | Get article details |
 | `nfn stories list` | List stories |
 | `nfn stories get <id>` | Get story details |
+| `nfn calendar list` | List calendar events (earnings, dividends, AGMs, etc.) |
+| `nfn calendar get <id>` | Get calendar event details |
 | `nfn companies list` | List companies |
 | `nfn companies get <identifier>` | Get company details (by ID or ticker) |
 | `nfn companies articles <identifier>` | List articles for a company |

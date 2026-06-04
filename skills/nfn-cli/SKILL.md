@@ -2,12 +2,13 @@
 name: nfn-cli
 description: |
   Use the nfn CLI to query Nordic financial news — articles, stories, companies, exchanges,
-  indices, watchlists, and categories across Sweden, Denmark, Norway, Finland, and Iceland.
+  indices, watchlists, calendar events, and categories across Sweden, Denmark, Norway, Finland, and Iceland.
   ALWAYS use this skill when the user wants to: find news about a Nordic company (Ericsson,
   Volvo, Novo Nordisk, Northvolt, Maersk, etc.), look up a company by ticker or ID (VOLV-B,
   ERIC-B, NOVO-B, NDA-SE, MAERSK-B), list companies on an exchange (XSTO, XCSE, XHEL, XOSL), see index
   constituents (OMXS30, OMXC25, OMXH25, OBX), search for financial news by topic, filter
-  articles by country or category, manage watchlists, or script/automate news queries with
+  articles by country or category, manage watchlists, see upcoming financial calendar events
+  (earnings reports, dividends, AGMs), or script/automate news queries with
   JSON output. Also use when troubleshooting nfn CLI errors (401, auth issues, rate limits)
   or when the user mentions nordicfinancialnews.com. Even if the user doesn't say "nfn"
   explicitly, trigger this skill whenever Nordic financial news data is needed.
@@ -22,6 +23,7 @@ triggers:
   - nfn exchanges
   - nfn indices
   - nfn watchlists
+  - nfn calendar
   - nfn categories
   - nfn countries
   - nfn sources
@@ -148,6 +150,14 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Only listed companies | `nfn stories list --listed` |
 | Filter by watchlist | `nfn stories list --watchlist-id <id>` |
 | Get story details | `nfn stories get <id> --format json` |
+| **Calendar** | |
+| List calendar events | `nfn calendar list --format json` |
+| Filter by ticker | `nfn calendar list --ticker VOLV-B` |
+| Filter by event type | `nfn calendar list --event-type earnings_report,dividend` |
+| Filter by date range | `nfn calendar list --scheduled-after 2026-01-01 --scheduled-before 2026-06-30` |
+| Filter by country | `nfn calendar list --country SE` |
+| Filter by watchlist | `nfn calendar list --watchlist-id <id>` |
+| Get calendar event details | `nfn calendar get <id> --format json` |
 | **Companies** | |
 | List companies | `nfn companies list --format json` |
 | Search companies | `nfn companies list --q "Volvo"` |
@@ -211,6 +221,7 @@ Looking for news?
 ├── Want a specific category? → nfn categories (to see options)
 │   └── then → nfn articles list --category "Economic Policy"
 ├── Want stories (clustered articles)? → nfn stories list
+├── Want upcoming events (earnings, dividends, AGMs)? → nfn calendar list --ticker VOLV-B
 ├── Only about listed companies? → nfn articles list --listed
 ├── Only about companies in a watchlist? → nfn watchlists list (to see IDs)
 │   └── then → nfn articles list --watchlist-id <id>

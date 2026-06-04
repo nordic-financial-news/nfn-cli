@@ -19,6 +19,8 @@ func TestBuildCatalogIncludesAllCommands(t *testing.T) {
 		"nfn companies stories",
 		"nfn stories list",
 		"nfn stories get",
+		"nfn calendar list",
+		"nfn calendar get",
 		"nfn categories",
 		"nfn countries list",
 		"nfn countries get",
