@@ -99,6 +99,8 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 10. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones).
 
+11. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
+
 ### Output Modes
 
 | Goal | Flag | What you get |
@@ -116,6 +118,24 @@ nfn <cmd> list --cursor <token> # Continue from a specific page
 ```
 
 `--all` fetches every page automatically. Use `--limit` for a quick sample. `--cursor` is for manual pagination using the `next_cursor` value from a previous response.
+
+### Plan Limits
+
+Some plans return only a subset of the matching records. When that happens the API sets a top-level flag that the CLI passes through:
+
+```bash
+nfn stories list --limit 25 --format json | jq '.data.plan_limited'   # true when records were hidden
+```
+
+```json
+{
+  "ok": true,
+  "data": { "stories": [ ... ], "plan_limited": true },
+  "summary": "4 stories (limited by your plan — some records were hidden)"
+}
+```
+
+This is independent of pagination: `plan_limited` can be `true` even when `next_cursor` is null, and `--all` still reports it after following every page. The key is absent when nothing was restricted, so `true` means capped and absent means complete.
 
 ### Filtering Fields
 

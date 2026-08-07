@@ -120,18 +120,18 @@ var indicesCompaniesCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			companies, _, err := client.ListAllIndexCompanies(cmd.Context(), args[0], params)
+			companies, resp, err := client.ListAllIndexCompanies(cmd.Context(), args[0], params)
 			if err != nil {
 				return err
 			}
-			return renderCompanies(f, companies, nil, "nfn indices companies")
+			return renderCompanies(f, companies, nil, planLimitedFrom(resp), "nfn indices companies")
 		}
 
-		companies, pagination, _, err := client.ListIndexCompanies(cmd.Context(), args[0], params)
+		companies, pagination, resp, err := client.ListIndexCompanies(cmd.Context(), args[0], params)
 		if err != nil {
 			return err
 		}
-		return renderCompanies(f, companies, pagination, "nfn indices companies")
+		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), "nfn indices companies")
 	},
 }
 

@@ -43,13 +43,16 @@ var searchCmd = &cobra.Command{
 
 		if f.Format() == "json" {
 			total := len(results.Companies) + len(results.Articles) + len(results.Stories)
-			return f.RenderEnvelope(results, fmt.Sprintf("%d results", total), breadcrumbsFor("nfn search"))
+			summary := planLimitedSummary(fmt.Sprintf("%d results", total), results.PlanLimited)
+			return f.RenderEnvelope(results, summary, breadcrumbsFor("nfn search"))
 		}
 
+		// A search response carries one plan_limited flag covering every
+		// section, so the note is printed once below rather than per section.
 		printed := false
 		if len(results.Companies) > 0 {
 			f.Println("Companies:")
-			if err := renderCompanies(f, results.Companies, nil); err != nil {
+			if err := renderCompanies(f, results.Companies, nil, nil); err != nil {
 				return err
 			}
 			f.Println()
@@ -57,7 +60,7 @@ var searchCmd = &cobra.Command{
 		}
 		if len(results.Articles) > 0 {
 			f.Println("Articles:")
-			if err := renderArticles(f, results.Articles, nil); err != nil {
+			if err := renderArticles(f, results.Articles, nil, nil); err != nil {
 				return err
 			}
 			f.Println()
@@ -65,7 +68,7 @@ var searchCmd = &cobra.Command{
 		}
 		if len(results.Stories) > 0 {
 			f.Println("Stories:")
-			if err := renderStories(f, results.Stories, nil); err != nil {
+			if err := renderStories(f, results.Stories, nil, nil); err != nil {
 				return err
 			}
 			f.Println()
@@ -74,6 +77,9 @@ var searchCmd = &cobra.Command{
 
 		if !printed {
 			f.Println("No results found.")
+		}
+		if isPlanLimited(results.PlanLimited) {
+			f.Println(planLimitedNote)
 		}
 
 		return nil

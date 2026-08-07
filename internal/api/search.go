@@ -11,6 +11,10 @@ type SearchResults struct {
 	Companies []Company  `json:"companies"`
 	Countries []Country  `json:"countries"`
 	Exchanges []Exchange `json:"exchanges"`
+	// PlanLimited is hoisted from the top level of the response, where it is a
+	// sibling of "results" rather than a member of it. It lives here so JSON
+	// output can surface it under .data without reshaping the payload.
+	PlanLimited *bool `json:"plan_limited,omitempty"`
 }
 
 type Country struct {
@@ -26,5 +30,7 @@ func (c *Client) Search(ctx context.Context, params url.Values) (*SearchResults,
 	if err != nil {
 		return nil, resp, err
 	}
-	return &wrapper.Results, resp, nil
+	results := wrapper.Results
+	results.PlanLimited = resp.PlanLimited
+	return &results, resp, nil
 }

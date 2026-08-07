@@ -83,6 +83,43 @@ func addFieldsFlag(cmd *cobra.Command) {
 	cmd.Flags().String("fields", "", "Comma-separated list of fields to include")
 }
 
+// planLimitedNote is printed under table output when the caller's plan hid
+// records from the result, so a capped result isn't mistaken for a short one.
+const planLimitedNote = "Note: results limited by your plan — some records were hidden."
+
+// planLimitedFrom returns the plan_limited flag carried on an API response,
+// tolerating a nil response.
+func planLimitedFrom(resp *api.Response) *bool {
+	if resp == nil {
+		return nil
+	}
+	return resp.PlanLimited
+}
+
+// isPlanLimited reports whether the API flagged the result as plan-limited. A
+// nil flag means the API said nothing, which is not the same as false.
+func isPlanLimited(planLimited *bool) bool {
+	return planLimited != nil && *planLimited
+}
+
+// addPlanLimited adds the plan_limited flag to a JSON result map when the API
+// sent one. Absent stays absent so consumers can tell "not restricted" from
+// "this endpoint doesn't report it".
+func addPlanLimited(result map[string]interface{}, planLimited *bool) {
+	if planLimited != nil {
+		result["plan_limited"] = *planLimited
+	}
+}
+
+// planLimitedSummary appends a truncation warning to an envelope summary, since
+// human-facing wrappers often read only the summary line.
+func planLimitedSummary(summary string, planLimited *bool) string {
+	if !isPlanLimited(planLimited) {
+		return summary
+	}
+	return summary + " (limited by your plan — some records were hidden)"
+}
+
 // paginationJSON returns a JSON-friendly pagination map, or nil if there's no next page.
 func paginationJSON(p *api.Pagination) map[string]interface{} {
 	if p == nil {

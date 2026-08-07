@@ -24,6 +24,11 @@ type RateLimitInfo struct {
 type Response struct {
 	StatusCode    int
 	RateLimitInfo *RateLimitInfo
+	// PlanLimited carries the top-level plan_limited flag when the API sends
+	// one. It is a pointer because the API omits the key entirely when no plan
+	// restriction applied, so nil ("the API said nothing") stays distinct from
+	// an explicit false.
+	PlanLimited *bool
 }
 
 // ClientOption configures the Client.
@@ -121,13 +126,37 @@ func (c *Client) doGet(ctx context.Context, path string, params url.Values, resu
 		return apiResp, apiErr
 	}
 
+	// Read the body up front so top-level metadata can be extracted alongside
+	// the caller's decode. Typed result structs silently discard JSON keys they
+	// don't declare, which would otherwise drop response-level fields.
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return apiResp, fmt.Errorf("reading response: %w", err)
+	}
+
+	apiResp.PlanLimited = extractPlanLimited(body)
+
 	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		if err := json.Unmarshal(body, result); err != nil {
 			return apiResp, fmt.Errorf("decoding response: %w", err)
 		}
 	}
 
 	return apiResp, nil
+}
+
+// extractPlanLimited pulls the top-level plan_limited flag out of a response
+// body. The API sets it on list endpoints when the caller's plan hid records
+// from the result, and omits it otherwise. Bodies that aren't JSON objects
+// yield nil rather than an error — this is metadata, not the payload.
+func extractPlanLimited(body []byte) *bool {
+	var meta struct {
+		PlanLimited *bool `json:"plan_limited"`
+	}
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return nil
+	}
+	return meta.PlanLimited
 }
 
 func parseRateLimitHeaders(h http.Header) *RateLimitInfo {

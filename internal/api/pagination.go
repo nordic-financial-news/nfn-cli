@@ -54,6 +54,7 @@ func ListPage[T any](ctx context.Context, c *Client, path string, params url.Val
 func ListAll[T any](ctx context.Context, c *Client, path string, params url.Values, resourceKey string) ([]T, *Response, error) {
 	var allItems []T
 	var lastResp *Response
+	var planLimited *bool
 
 	p := url.Values{}
 	for k, v := range params {
@@ -68,10 +69,20 @@ func ListAll[T any](ctx context.Context, c *Client, path string, params url.Valu
 		lastResp = resp
 		allItems = append(allItems, items...)
 
+		// A single restricted page makes the whole aggregate incomplete, so the
+		// flag is sticky once any page reports true.
+		if resp != nil && resp.PlanLimited != nil && (planLimited == nil || !*planLimited) {
+			planLimited = resp.PlanLimited
+		}
+
 		if pagination.NextCursor == "" {
 			break
 		}
 		p.Set("cursor", pagination.NextCursor)
+	}
+
+	if lastResp != nil {
+		lastResp.PlanLimited = planLimited
 	}
 
 	return allItems, lastResp, nil

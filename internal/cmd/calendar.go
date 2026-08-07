@@ -33,18 +33,18 @@ var calendarListCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			events, _, err := client.ListAllCalendarEvents(cmd.Context(), params)
+			events, resp, err := client.ListAllCalendarEvents(cmd.Context(), params)
 			if err != nil {
 				return watchlistFilterError(err, watchlistID)
 			}
-			return renderCalendarEvents(f, events, nil)
+			return renderCalendarEvents(f, events, nil, planLimitedFrom(resp))
 		}
 
-		events, pagination, _, err := client.ListCalendarEvents(cmd.Context(), params)
+		events, pagination, resp, err := client.ListCalendarEvents(cmd.Context(), params)
 		if err != nil {
 			return watchlistFilterError(err, watchlistID)
 		}
-		return renderCalendarEvents(f, events, pagination)
+		return renderCalendarEvents(f, events, pagination, planLimitedFrom(resp))
 	},
 }
 
@@ -151,17 +151,19 @@ func buildCalendarParams(cmd *cobra.Command) url.Values {
 	return params
 }
 
-func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagination *api.Pagination, cmdPath ...string) error {
+func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
 		result := map[string]interface{}{"calendar_events": events}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
+		addPlanLimited(result, planLimited)
 		path := "nfn calendar list"
 		if len(cmdPath) > 0 {
 			path = cmdPath[0]
 		}
-		return f.RenderEnvelope(result, fmt.Sprintf("%d calendar events", len(events)), breadcrumbsFor(path))
+		summary := planLimitedSummary(fmt.Sprintf("%d calendar events", len(events)), planLimited)
+		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
 	columns := []string{"ID", "Date", "Type", "Title", "Company", "Status"}
@@ -170,6 +172,9 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 		rows[i] = []string{e.ID, eventDate(e), e.EventType, truncate(e.Title, 60), e.CompanyID, e.Status}
 	}
 	f.Render(columns, rows)
+	if isPlanLimited(planLimited) {
+		f.Println(planLimitedNote)
+	}
 	return nil
 }
 

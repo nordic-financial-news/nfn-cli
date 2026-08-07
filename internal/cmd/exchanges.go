@@ -121,18 +121,18 @@ var exchangesCompaniesCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			companies, _, err := client.ListAllExchangeCompanies(cmd.Context(), args[0], params)
+			companies, resp, err := client.ListAllExchangeCompanies(cmd.Context(), args[0], params)
 			if err != nil {
 				return err
 			}
-			return renderCompanies(f, companies, nil, "nfn exchanges companies")
+			return renderCompanies(f, companies, nil, planLimitedFrom(resp), "nfn exchanges companies")
 		}
 
-		companies, pagination, _, err := client.ListExchangeCompanies(cmd.Context(), args[0], params)
+		companies, pagination, resp, err := client.ListExchangeCompanies(cmd.Context(), args[0], params)
 		if err != nil {
 			return err
 		}
-		return renderCompanies(f, companies, pagination, "nfn exchanges companies")
+		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), "nfn exchanges companies")
 	},
 }
 

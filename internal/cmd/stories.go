@@ -37,18 +37,18 @@ var storiesListCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			stories, _, err := client.ListAllStories(cmd.Context(), params)
+			stories, resp, err := client.ListAllStories(cmd.Context(), params)
 			if err != nil {
 				return watchlistFilterError(err, watchlistID)
 			}
-			return renderStories(f, stories, nil)
+			return renderStories(f, stories, nil, planLimitedFrom(resp))
 		}
 
-		stories, pagination, _, err := client.ListStories(cmd.Context(), params)
+		stories, pagination, resp, err := client.ListStories(cmd.Context(), params)
 		if err != nil {
 			return watchlistFilterError(err, watchlistID)
 		}
-		return renderStories(f, stories, pagination)
+		return renderStories(f, stories, pagination, planLimitedFrom(resp))
 	},
 }
 
@@ -149,17 +149,19 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	return params
 }
 
-func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pagination, cmdPath ...string) error {
+func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
 		result := map[string]interface{}{"stories": stories}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
+		addPlanLimited(result, planLimited)
 		path := "nfn stories list"
 		if len(cmdPath) > 0 {
 			path = cmdPath[0]
 		}
-		return f.RenderEnvelope(result, fmt.Sprintf("%d stories", len(stories)), breadcrumbsFor(path))
+		summary := planLimitedSummary(fmt.Sprintf("%d stories", len(stories)), planLimited)
+		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
 	columns := []string{"ID", "Title", "Country", "Articles", "Published"}
@@ -168,6 +170,9 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 		rows[i] = []string{s.ID, truncate(s.Title, 60), s.Country, fmt.Sprintf("%d", s.ArticleCount), s.PublishedAt}
 	}
 	f.Render(columns, rows)
+	if isPlanLimited(planLimited) {
+		f.Println(planLimitedNote)
+	}
 	return nil
 }
 

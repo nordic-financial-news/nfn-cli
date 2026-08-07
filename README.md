@@ -77,6 +77,8 @@ Use `nfn <command> --help` for all available flags.
 - **Piped/scripted:** JSON format
 - Override with `--format table` or `--format json`
 
+If your plan restricts a list result, the response carries `data.plan_limited: true` in JSON (and a note under the table), so a capped result is distinguishable from a genuinely short one.
+
 ## AI Agent Integration
 
 `nfn` works with any AI agent that can run shell commands.

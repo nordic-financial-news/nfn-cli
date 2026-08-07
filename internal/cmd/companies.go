@@ -68,18 +68,18 @@ var companiesListCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			companies, _, err := client.ListAllCompanies(cmd.Context(), params)
+			companies, resp, err := client.ListAllCompanies(cmd.Context(), params)
 			if err != nil {
 				return err
 			}
-			return renderCompanies(f, companies, nil)
+			return renderCompanies(f, companies, nil, planLimitedFrom(resp))
 		}
 
-		companies, pagination, _, err := client.ListCompanies(cmd.Context(), params)
+		companies, pagination, resp, err := client.ListCompanies(cmd.Context(), params)
 		if err != nil {
 			return err
 		}
-		return renderCompanies(f, companies, pagination)
+		return renderCompanies(f, companies, pagination, planLimitedFrom(resp))
 	},
 }
 
@@ -253,18 +253,18 @@ var companiesArticlesCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			articles, _, err := client.ListAllCompanyArticles(cmd.Context(), args[0], params)
+			articles, resp, err := client.ListAllCompanyArticles(cmd.Context(), args[0], params)
 			if err != nil {
 				return err
 			}
-			return renderArticles(f, articles, nil, "nfn companies articles")
+			return renderArticles(f, articles, nil, planLimitedFrom(resp), "nfn companies articles")
 		}
 
-		articles, pagination, _, err := client.ListCompanyArticles(cmd.Context(), args[0], params)
+		articles, pagination, resp, err := client.ListCompanyArticles(cmd.Context(), args[0], params)
 		if err != nil {
 			return err
 		}
-		return renderArticles(f, articles, pagination, "nfn companies articles")
+		return renderArticles(f, articles, pagination, planLimitedFrom(resp), "nfn companies articles")
 	},
 }
 
@@ -287,32 +287,34 @@ var companiesStoriesCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			stories, _, err := client.ListAllCompanyStories(cmd.Context(), args[0], params)
+			stories, resp, err := client.ListAllCompanyStories(cmd.Context(), args[0], params)
 			if err != nil {
 				return err
 			}
-			return renderStories(f, stories, nil, "nfn companies stories")
+			return renderStories(f, stories, nil, planLimitedFrom(resp), "nfn companies stories")
 		}
 
-		stories, pagination, _, err := client.ListCompanyStories(cmd.Context(), args[0], params)
+		stories, pagination, resp, err := client.ListCompanyStories(cmd.Context(), args[0], params)
 		if err != nil {
 			return err
 		}
-		return renderStories(f, stories, pagination, "nfn companies stories")
+		return renderStories(f, stories, pagination, planLimitedFrom(resp), "nfn companies stories")
 	},
 }
 
-func renderCompanies(f *output.Formatter, companies []api.Company, pagination *api.Pagination, cmdPath ...string) error {
+func renderCompanies(f *output.Formatter, companies []api.Company, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
 		result := map[string]interface{}{"companies": companies}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
+		addPlanLimited(result, planLimited)
 		path := "nfn companies list"
 		if len(cmdPath) > 0 {
 			path = cmdPath[0]
 		}
-		return f.RenderEnvelope(result, fmt.Sprintf("%d companies", len(companies)), breadcrumbsFor(path))
+		summary := planLimitedSummary(fmt.Sprintf("%d companies", len(companies)), planLimited)
+		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
 	columns := []string{"ID", "Name", "Ticker", "Exchange", "Active"}
@@ -329,6 +331,9 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 		rows[i] = []string{c.ID, c.Name, c.TickerSymbol, exchange, active}
 	}
 	f.Render(columns, rows)
+	if isPlanLimited(planLimited) {
+		f.Println(planLimitedNote)
+	}
 	return nil
 }
 
