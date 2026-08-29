@@ -173,6 +173,13 @@ var companiesGetCmd = &cobra.Command{
 			}
 			fields = append(fields, output.Field{Key: "Stock Listings", Value: strings.Join(listings, ", ")})
 		}
+		if len(company.AlsoListedOn) > 0 {
+			other := make([]string, len(company.AlsoListedOn))
+			for i, l := range company.AlsoListedOn {
+				other[i] = fmt.Sprintf("%s @ %s", l.TickerSymbol, l.MicCode)
+			}
+			fields = append(fields, output.Field{Key: "Also Listed On", Value: strings.Join(other, ", ")})
+		}
 		if company.ArticleCount > 0 {
 			fields = append(fields, output.Field{Key: "Articles", Value: fmt.Sprintf("%d", company.ArticleCount)})
 		}

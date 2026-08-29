@@ -22,8 +22,17 @@ type Company struct {
 	ArticleCount  int             `json:"article_count,omitempty"`
 	StoryCount    int             `json:"story_count,omitempty"`
 	StockListings []StockListing  `json:"stock_listings,omitempty"`
+	AlsoListedOn  []OtherListing  `json:"also_listed_on,omitempty"`
 	Registry      *Registry       `json:"registry,omitempty"`
 	UpdatedAt     string          `json:"updated_at,omitempty"`
+}
+
+// OtherListing is one of a company's other active stock listings, pairing a
+// ticker with the MIC code of the venue it trades on. It appears in the
+// also_listed_on array on company summary objects.
+type OtherListing struct {
+	TickerSymbol string `json:"ticker"`
+	MicCode      string `json:"mic_code"`
 }
 
 type CompanyCountry struct {

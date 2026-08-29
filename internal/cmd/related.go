@@ -86,6 +86,7 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 	},
 	"nfn sources list": {
 		{Description: "Filter articles by source", Command: "nfn articles list --sources <ids>"},
+		{Description: "Filter articles by source type", Command: "nfn articles list --source-type <type>"},
 		{Description: "Filter stories by source", Command: "nfn stories list --sources <ids>"},
 	},
 	"nfn search": {

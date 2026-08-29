@@ -21,7 +21,7 @@ func TestListSources(t *testing.T) {
 
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"sources": []map[string]interface{}{
-				{"id": "src1", "name": "Dagens Industri", "domain": "di.se", "country": "SE"},
+				{"id": "src1", "name": "Dagens Industri", "domain": "di.se", "country": "SE", "source_type": "news_publication"},
 			},
 			"pagination": map[string]interface{}{"count": 1},
 		})
@@ -49,6 +49,9 @@ func TestListSources(t *testing.T) {
 	}
 	if sources[0].Country != "SE" {
 		t.Errorf("Country = %q, want %q", sources[0].Country, "SE")
+	}
+	if sources[0].SourceType != "news_publication" {
+		t.Errorf("SourceType = %q, want %q", sources[0].SourceType, "news_publication")
 	}
 	if pagination.Count != 1 {
 		t.Errorf("Count = %d, want 1", pagination.Count)

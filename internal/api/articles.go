@@ -29,10 +29,11 @@ type Category struct {
 }
 
 type Source struct {
-	ID      string `json:"id,omitempty"`
-	Name    string `json:"name"`
-	Domain  string `json:"domain"`
-	Country string `json:"country,omitempty"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name"`
+	Domain     string `json:"domain"`
+	Country    string `json:"country,omitempty"`
+	SourceType string `json:"source_type,omitempty"`
 }
 
 func (c *Client) ListArticles(ctx context.Context, params url.Values) ([]Article, *Pagination, *Response, error) {

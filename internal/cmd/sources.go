@@ -21,7 +21,7 @@ var sourcesListCmd = &cobra.Command{
 	Example: `  nfn sources list
   nfn sources list --limit 10
   nfn sources list --all --format json
-  nfn sources list --fields id,name,domain`,
+  nfn sources list --fields id,name,source_type`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
@@ -63,10 +63,10 @@ func renderSources(f *output.Formatter, sources []api.Source, pagination *api.Pa
 		return f.RenderEnvelope(result, fmt.Sprintf("%d sources", len(sources)), breadcrumbsFor("nfn sources list"))
 	}
 
-	columns := []string{"ID", "Name", "Domain", "Country"}
+	columns := []string{"ID", "Name", "Domain", "Country", "Type"}
 	rows := make([][]string, len(sources))
 	for i, s := range sources {
-		rows[i] = []string{s.ID, s.Name, s.Domain, s.Country}
+		rows[i] = []string{s.ID, s.Name, s.Domain, s.Country, s.SourceType}
 	}
 	f.Render(columns, rows)
 	return nil

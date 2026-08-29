@@ -26,6 +26,7 @@ var articlesListCmd = &cobra.Command{
   nfn articles list --index OMXS30
   nfn articles list --q "battery" --limit 10
   nfn articles list --sources abc123,def456
+  nfn articles list --source-type stock_exchange,wire_service
   nfn articles list --listed
   nfn articles list --watchlist-id a1b2c3d4e5f6
   nfn articles list --all --format json`,
@@ -77,8 +78,10 @@ var articlesGetCmd = &cobra.Command{
 			category = article.Category.Name
 		}
 		source := ""
+		sourceType := ""
 		if article.Source != nil {
 			source = article.Source.Name
+			sourceType = article.Source.SourceType
 		}
 		companies := make([]string, len(article.Companies))
 		for i, c := range article.Companies {
@@ -100,8 +103,12 @@ var articlesGetCmd = &cobra.Command{
 			{Key: "Country", Value: article.Country},
 			{Key: "Category", Value: category},
 			{Key: "Source", Value: source},
-			{Key: "Companies", Value: strings.Join(companies, ", ")},
 		}
+
+		if sourceType != "" {
+			fields = append(fields, output.Field{Key: "Source Type", Value: sourceType})
+		}
+		fields = append(fields, output.Field{Key: "Companies", Value: strings.Join(companies, ", ")})
 
 		if len(article.KeyPoints) > 0 {
 			fields = append(fields, output.Field{Key: "Key Points", Value: strings.Join(article.KeyPoints, "\n")})
@@ -156,6 +163,9 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	}
 	if v, _ := cmd.Flags().GetString("sources"); v != "" {
 		params.Set("sources", v)
+	}
+	if v, _ := cmd.Flags().GetString("source-type"); v != "" {
+		params.Set("source_type", v)
 	}
 	if v, _ := cmd.Flags().GetBool("listed"); v {
 		params.Set("listed", "true")
@@ -230,6 +240,7 @@ func init() {
 	articlesListCmd.Flags().String("q", "", "Search query")
 	articlesListCmd.Flags().String("ids", "", "Comma-separated article IDs")
 	articlesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
+	articlesListCmd.Flags().String("source-type", "", "Filter by source type (comma-separated: news_publication, wire_service, press_release, government, trade_publication, blog, stock_exchange, research)")
 	articlesListCmd.Flags().Bool("listed", false, "Only show articles about listed companies")
 	articlesListCmd.Flags().String("watchlist-id", "", "Only show articles for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(articlesListCmd)

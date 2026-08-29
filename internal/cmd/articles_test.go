@@ -78,6 +78,11 @@ func TestBuildArticleParams(t *testing.T) {
 			wantKV: map[string]string{"sources": "id1,id2"},
 		},
 		{
+			name:   "source-type maps to source_type",
+			flags:  map[string]string{"source-type": "stock_exchange,wire_service"},
+			wantKV: map[string]string{"source_type": "stock_exchange,wire_service"},
+		},
+		{
 			name:   "watchlist-id maps to watchlist",
 			flags:  map[string]string{"watchlist-id": "a1b2c3d4e5f6"},
 			wantKV: map[string]string{"watchlist": "a1b2c3d4e5f6"},
@@ -135,6 +140,7 @@ func TestBuildArticleParams(t *testing.T) {
 			cmd.Flags().String("q", "", "")
 			cmd.Flags().String("ids", "", "")
 			cmd.Flags().String("sources", "", "")
+			cmd.Flags().String("source-type", "", "")
 			cmd.Flags().Bool("listed", false, "")
 			cmd.Flags().String("watchlist-id", "", "")
 			cmd.Flags().Int("limit", 0, "")

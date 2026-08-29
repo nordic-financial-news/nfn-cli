@@ -157,6 +157,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by index | `nfn articles list --index OMXS30` |
 | Filter by sector | `nfn articles list --sector Industrials` |
 | Filter by source | `nfn articles list --sources <id1,id2>` |
+| Filter by source type | `nfn articles list --source-type stock_exchange,wire_service` |
 | Filter by date range | `nfn articles list --published-after 2025-01-01 --published-before 2025-06-01` |
 | Search articles by text | `nfn articles list --q "battery"` |
 | Only listed companies | `nfn articles list --listed` |
@@ -221,6 +222,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | List sources | `nfn sources list --format json` |
 | Paginate all sources | `nfn sources list --all --format json` |
 | Filter articles by source | `nfn articles list --sources <id1,id2>` |
+| Filter articles by source type | `nfn articles list --source-type stock_exchange` |
 | Filter stories by source | `nfn stories list --sources <id1,id2>` |
 | **Watchlists** | |
 | List watchlists | `nfn watchlists list --format json` |
@@ -247,6 +249,8 @@ Looking for news?
 ├── Want a specific country? → nfn articles list --country SE
 ├── Want a specific source? → nfn sources list (to see IDs)
 │   └── then → nfn articles list --sources <id1,id2>
+├── Want a kind of source (exchange feeds, wire services...)? → nfn articles list --source-type stock_exchange
+│   └── Fastest disclosure tier → nfn articles list --source-type stock_exchange
 ├── Want a specific category? → nfn categories (to see options)
 │   └── then → nfn articles list --category "Economic Policy"
 ├── Want stories (clustered articles)? → nfn stories list
