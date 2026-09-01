@@ -199,6 +199,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by ticker | `nfn calendar list --ticker VOLV-B` |
 | Filter by company ID | `nfn calendar list --company <id>` |
 | Filter by event type | `nfn calendar list --event-type earnings_report,dividend` |
+| Filter by status | `nfn calendar list --status scheduled` |
 | Filter by date range | `nfn calendar list --scheduled-after 2026-01-01 --scheduled-before 2026-06-30` |
 | Filter by event country | `nfn calendar list --country SE,NO` |
 | Filter by listing market | `nfn calendar list --market SE` |
