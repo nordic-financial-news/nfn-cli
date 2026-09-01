@@ -162,6 +162,8 @@ func TestSemanticError(t *testing.T) {
 	}
 	rateLimited := &api.APIError{StatusCode: 429, Detail: "Too many requests", RetryAfter: 30 * time.Minute}
 	forbidden := &api.APIError{StatusCode: 403, Detail: "Forbidden"}
+	notRolledOut := &api.APIError{StatusCode: 400, Detail: "Unknown parameter 'mode'"}
+	badQuery := &api.APIError{StatusCode: 400, Detail: "q must be between 2 and 200 characters"}
 
 	tests := []struct {
 		name     string
@@ -193,6 +195,26 @@ func TestSemanticError(t *testing.T) {
 			err:      rateLimited,
 			semantic: true,
 			want:     "retry in 30m0s",
+		},
+		{
+			// Semantic rolls out per key; a key outside it must be told to drop
+			// --semantic, not shown a parameter name it never typed.
+			name:     "key outside the rollout gets an actionable message",
+			err:      notRolledOut,
+			semantic: true,
+			want:     "not enabled for this API key yet",
+		},
+		{
+			name:     "rollout message names the flag the user typed",
+			err:      notRolledOut,
+			semantic: true,
+			want:     "Drop --semantic",
+		},
+		{
+			name:     "an ordinary 400 is not mistaken for the rollout",
+			err:      badQuery,
+			semantic: true,
+			want:     "q must be between 2 and 200 characters",
 		},
 		{
 			name:     "unrelated API errors pass through",

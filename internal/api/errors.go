@@ -42,6 +42,26 @@ func (e *APIError) IsRateLimited() bool {
 	return e.StatusCode == 429
 }
 
+// IsUnknownParameter reports whether the API rejected the request because it
+// did not recognise the named query parameter. This is what a caller receives
+// for a parameter gated behind a feature flag their key is not part of yet, so
+// it is distinguishable from a parameter that is simply malformed.
+func (e *APIError) IsUnknownParameter(name string) bool {
+	if e.StatusCode != http.StatusBadRequest && e.StatusCode != http.StatusUnprocessableEntity {
+		return false
+	}
+	msg := strings.ToLower(e.Title + " " + e.Detail)
+	if !strings.Contains(msg, strings.ToLower(name)) || !strings.Contains(msg, "parameter") {
+		return false
+	}
+	for _, adjective := range []string{"unknown", "unrecognized", "unrecognised", "invalid", "unsupported"} {
+		if strings.Contains(msg, adjective) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsSemanticUnavailable reports whether a semantic search failed because the
 // embedding backend was unreachable. The API answers 503 with problem type
 // "semantic-unavailable" rather than quietly falling back to lexical matching,

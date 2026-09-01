@@ -211,6 +211,11 @@ func semanticError(err error, semantic bool) error {
 	}
 
 	switch {
+	case apiErr.IsUnknownParameter("mode"):
+		// Semantic search rolls out per API key, so a key outside the rollout
+		// gets its "mode" parameter rejected. Name --semantic, which the caller
+		// actually typed, rather than the mode parameter it sets for them.
+		return fmt.Errorf("semantic search is not enabled for this API key yet (the API rejected the 'mode' parameter that --semantic sets). Drop --semantic to run the same query as a keyword search")
 	case apiErr.IsSemanticUnavailable():
 		return fmt.Errorf("semantic search is temporarily unavailable (the API returned 503). It never falls back to keyword matching, so either retry shortly or drop --semantic to run the same query lexically")
 	case apiErr.IsRateLimited():

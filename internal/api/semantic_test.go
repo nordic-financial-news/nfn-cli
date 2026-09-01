@@ -122,6 +122,44 @@ func TestAPIError_IsSemanticUnavailable(t *testing.T) {
 	}
 }
 
+func TestAPIError_IsUnknownParameter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		status int
+		title  string
+		detail string
+		want   bool
+	}{
+		{
+			name:   "the rollout rejection the changelog quotes",
+			status: 400,
+			detail: "Unknown parameter 'mode'",
+			want:   true,
+		},
+		{name: "422 variant", status: 422, detail: "Unrecognized parameter: mode", want: true},
+		{name: "wording in the title", status: 400, title: "Invalid parameter 'mode'", want: true},
+		{name: "case insensitive", status: 400, detail: "UNKNOWN PARAMETER 'MODE'", want: true},
+		// Must not swallow unrelated 400s: a bad value for a parameter the API
+		// does know about is a different problem with a different fix.
+		{name: "bad value for a known parameter", status: 400, detail: "q must be between 2 and 200 characters", want: false},
+		{name: "a different unknown parameter", status: 400, detail: "Unknown parameter 'sort'", want: false},
+		{name: "not a parameter problem at all", status: 400, detail: "Malformed request", want: false},
+		{name: "wrong status", status: 500, detail: "Unknown parameter 'mode'", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			e := &APIError{StatusCode: tt.status, Title: tt.title, Detail: tt.detail}
+			if got := e.IsUnknownParameter("mode"); got != tt.want {
+				t.Errorf("IsUnknownParameter(\"mode\") = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGet_SemanticUnavailable(t *testing.T) {
 	t.Parallel()
 
