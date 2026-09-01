@@ -16,6 +16,16 @@ builds:
       - amd64
       - arm64
 
+# Pin the release target rather than letting goreleaser infer it from the git
+# remote. Locally, `origin` is a personal fork, which silently produced a tap
+# formula whose download URLs pointed at the fork while its homepage still read
+# nordic-financial-news. Naming the repo makes a release from the wrong place
+# fail loudly on permissions instead of publishing to the wrong one.
+release:
+  github:
+    owner: nordic-financial-news
+    name: nfn-cli
+
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     formats:
