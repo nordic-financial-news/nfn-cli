@@ -60,6 +60,31 @@ func TestBuildStoryParams(t *testing.T) {
 			ints:   map[string]int{"limit": 25},
 			wantKV: map[string]string{"limit": "25"},
 		},
+		{
+			name:   "market flag",
+			flags:  map[string]string{"market": "SE"},
+			wantKV: map[string]string{"market": "SE"},
+		},
+		{
+			name:   "domicile flag",
+			flags:  map[string]string{"domicile": "FI"},
+			wantKV: map[string]string{"domicile": "FI"},
+		},
+		{
+			name:   "market and domicile accept comma-separated lists",
+			flags:  map[string]string{"market": "SE,NO", "domicile": "FI,DK"},
+			wantKV: map[string]string{"market": "SE,NO", "domicile": "FI,DK"},
+		},
+		{
+			name:   "exchange accepts comma-separated MIC codes",
+			flags:  map[string]string{"exchange": "XSTO,XCSE"},
+			wantKV: map[string]string{"exchange": "XSTO,XCSE"},
+		},
+		{
+			name:   "country, market, and domicile are independent filters",
+			flags:  map[string]string{"country": "SE", "market": "NO", "domicile": "DK"},
+			wantKV: map[string]string{"country": "SE", "market": "NO", "domicile": "DK"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -69,6 +94,8 @@ func TestBuildStoryParams(t *testing.T) {
 			cmd := *storiesListCmd
 			cmd.ResetFlags()
 			cmd.Flags().String("country", "", "")
+			cmd.Flags().String("market", "", "")
+			cmd.Flags().String("domicile", "", "")
 			cmd.Flags().String("category", "", "")
 			cmd.Flags().String("ticker", "", "")
 			cmd.Flags().String("company", "", "")

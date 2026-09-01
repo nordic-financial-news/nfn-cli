@@ -93,13 +93,24 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 7. **Breadcrumbs suggest next commands** — the `breadcrumbs` array in JSON output suggests logical follow-up commands. Use these to navigate the data model (e.g., from a company to its articles).
 
-8. **Country codes are ISO2** — use `SE` for Sweden, `DK` for Denmark, `FI` for Finland, `NO` for Norway, `IS` for Iceland. Run `nfn countries list` if unsure. The `--country` filter accepts a comma-separated list to combine countries, e.g. `--country SE,NO,FI`.
+8. **Country codes are ISO2** — use `SE` for Sweden, `DK` for Denmark, `FI` for Finland, `NO` for Norway, `IS` for Iceland. Run `nfn countries list` if unsure. Every country filter accepts a comma-separated list to combine countries, e.g. `--country SE,NO,FI`.
 
-9. **Exchange codes are MIC codes** — use `XSTO` for Stockholm, `XCSE` for Copenhagen, `XHEL` for Helsinki, `XOSL` for Oslo. Run `nfn exchanges list` if unsure.
+9. **Pick the right country filter: `--country`, `--market`, or `--domicile`** — these ask three different questions, and the one you want depends on what "Swedish" means in the request. All three are ISO2 and comma-separated, and they combine as an intersection with each other and with every other filter.
 
-10. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones).
+   - `--market` — **companies with an active equity listing on an exchange in these countries.** This is the "on the Swedish market" question. `--market SE` covers Nasdaq Stockholm, First North, Spotlight, and NGM together, so it reaches a company listed only on a growth-market segment that `--exchange XSTO` would miss. It includes foreign-domiciled issuers that are listed locally.
+   - `--domicile` — **companies legally domiciled in these countries.** This is the "Swedish company" question. It reaches unlisted companies, and it excludes foreign-domiciled issuers that only happen to be listed locally.
+   - `--country` — resource-dependent, so read it carefully:
+     - On `articles` and `stories`, this is the item's own country.
+     - On `calendar`, this is the event's own country (the issuer's, falling back to the source's) — distinct from both `--market` and `--domicile`.
+     - On `companies`, this already means legal domicile; `--domicile` is the canonical name for the same filter. Passing both applies both, intersected, like any other filter pair.
 
-11. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
+   Available on `articles list`, `stories list`, `companies list`, and `calendar list`.
+
+10. **Exchange codes are MIC codes** — use `XSTO` for Stockholm, `XCSE` for Copenhagen, `XHEL` for Helsinki, `XOSL` for Oslo. Run `nfn exchanges list` if unsure. `--exchange` accepts a comma-separated list of MICs to cover several venues in one call, e.g. `--exchange XSTO,XCSE`. Reach for `--market SE` instead when you want a whole national market rather than named venues. Note that `--exchange` matches only active listings (and, on `nfn indices list`, only active exchanges) — a company whose sole listing on that exchange is delisted will not appear.
+
+11. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones).
+
+12. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
 
 ### Output Modes
 
@@ -153,7 +164,9 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by category | `nfn articles list --category "Economic Policy"` |
 | Filter by ticker | `nfn articles list --ticker VOLV-B` |
 | Filter by company ID | `nfn articles list --company <id>` |
-| Filter by exchange | `nfn articles list --exchange XSTO` |
+| Filter by exchange | `nfn articles list --exchange XSTO,XCSE` |
+| Filter by listing market | `nfn articles list --market SE` |
+| Filter by legal domicile | `nfn articles list --domicile FI` |
 | Filter by index | `nfn articles list --index OMXS30` |
 | Filter by sector | `nfn articles list --sector Industrials` |
 | Filter by source | `nfn articles list --sources <id1,id2>` |
@@ -172,7 +185,9 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter stories by category | `nfn stories list --category "Mergers & Acquisitions"` |
 | Filter stories by ticker | `nfn stories list --ticker VOLV-B` |
 | Filter stories by company ID | `nfn stories list --company <id>` |
-| Filter stories by exchange | `nfn stories list --exchange XSTO` |
+| Filter stories by exchange | `nfn stories list --exchange XSTO,XCSE` |
+| Filter stories by listing market | `nfn stories list --market SE` |
+| Filter stories by legal domicile | `nfn stories list --domicile FI` |
 | Filter stories by index | `nfn stories list --index OMXS30` |
 | Filter stories by sector | `nfn stories list --sector Industrials` |
 | Filter stories by source | `nfn stories list --sources <id1,id2>` |
@@ -185,15 +200,20 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by company ID | `nfn calendar list --company <id>` |
 | Filter by event type | `nfn calendar list --event-type earnings_report,dividend` |
 | Filter by date range | `nfn calendar list --scheduled-after 2026-01-01 --scheduled-before 2026-06-30` |
-| Filter by country | `nfn calendar list --country SE,NO` |
+| Filter by event country | `nfn calendar list --country SE,NO` |
+| Filter by listing market | `nfn calendar list --market SE` |
+| Filter by legal domicile | `nfn calendar list --domicile FI` |
+| Filter by exchange | `nfn calendar list --exchange XSTO,XCSE` |
 | Filter by watchlist | `nfn calendar list --watchlist-id <id>` |
 | Get calendar event details | `nfn calendar get <id> --format json` |
 | **Companies** | |
 | List companies | `nfn companies list --format json` |
 | Search companies | `nfn companies list --q "Volvo"` |
-| Filter by exchange | `nfn companies list --exchange XSTO` |
+| Filter by exchange | `nfn companies list --exchange XSTO,XCSE` |
+| Filter by listing market | `nfn companies list --market SE` |
+| Filter by legal domicile | `nfn companies list --domicile SE` |
 | Filter by sector | `nfn companies list --sector Financials` |
-| Only listed companies | `nfn companies list --listed` |
+| Only companies with an active listing | `nfn companies list --listed` |
 | Only active companies | `nfn companies list --is-active` |
 | Get company details | `nfn companies get VOLV-B --format json` |
 | Company articles | `nfn companies articles VOLV-B --limit 5` |
@@ -206,7 +226,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | List exchange companies | `nfn exchanges companies XSTO --limit 20` |
 | **Indices** | |
 | List indices | `nfn indices list --format json` |
-| Filter by exchange | `nfn indices list --exchange XSTO` |
+| Filter by exchange | `nfn indices list --exchange XSTO,XCSE` |
 | Get index details | `nfn indices get OMXS30 --format json` |
 | List index companies | `nfn indices companies OMXS30 --all` |
 | **Search** | |
@@ -247,6 +267,8 @@ Looking for news?
 │   └── Multiple matches? → Ask user or note which entity you're using
 ├── Know the topic? → nfn search "topic" --type articles
 ├── Want a specific country? → nfn articles list --country SE
+├── Want a whole national market (all its venues)? → nfn articles list --market SE
+├── Want companies legally domiciled somewhere? → nfn articles list --domicile SE
 ├── Want a specific source? → nfn sources list (to see IDs)
 │   └── then → nfn articles list --sources <id1,id2>
 ├── Want a kind of source (exchange feeds, wire services...)? → nfn articles list --source-type stock_exchange
@@ -272,7 +294,10 @@ Looking for a company?
 ├── Want companies on an exchange? → nfn exchanges companies XSTO
 ├── Want companies in an index? → nfn indices companies OMXS30
 ├── Want companies in a sector? → nfn companies list --sector Financials
-├── Want companies in a country? → nfn companies list --country SE
+├── Want companies in a country? → nfn companies list --domicile SE
+├── Want companies traded on a national market? → nfn companies list --market SE
+│   └── Includes First North / Spotlight / NGM, and foreign issuers listed there
+├── Want companies on named venues? → nfn companies list --exchange XSTO,XCSE
 ├── Only active companies? → nfn companies list --is-active
 └── Cross-resource search? → nfn search "query" --type companies
 ```
@@ -284,7 +309,7 @@ Exploring Nordic markets?
 ├── Which exchanges exist? → nfn exchanges list
 ├── Details on an exchange? → nfn exchanges get XSTO
 ├── Which indices exist? → nfn indices list
-├── Which indices on an exchange? → nfn indices list --exchange XSTO
+├── Which indices on an exchange? → nfn indices list --exchange XSTO,XCSE
 ├── Companies in an index? → nfn indices companies OMXS30
 ├── Which countries are covered? → nfn countries list
 └── Country details + exchanges? → nfn countries get SE
@@ -355,6 +380,27 @@ nfn exchanges get XSTO --format json
 
 # List companies on the exchange
 nfn exchanges companies XSTO --all --format json
+```
+
+### Target a national market, a venue, or a domicile
+
+```bash
+# Everything traded on the Swedish market: Nasdaq Stockholm, First North,
+# Spotlight and NGM together, including foreign issuers listed there
+nfn companies list --market SE --all --format json
+
+# Only the named venues you list, and only where the listing is still active
+nfn companies list --exchange XSTO,XCSE --all --format json
+
+# Swedish-domiciled companies, including private and unlisted ones
+nfn companies list --domicile SE --all --format json
+
+# The same distinction applies to content: news about issuers on the
+# Swedish market, whatever country the article itself came from
+nfn articles list --market SE --published-after 2026-01-01 --format json
+
+# Earnings dates for issuers listed in Sweden or Denmark
+nfn calendar list --market SE,DK --event-type earnings_report --format json
 ```
 
 ### Filter news by source

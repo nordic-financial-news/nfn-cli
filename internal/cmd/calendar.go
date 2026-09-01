@@ -22,6 +22,9 @@ var calendarListCmd = &cobra.Command{
   nfn calendar list --company cmpny1234567
   nfn calendar list --event-type earnings_report,dividend
   nfn calendar list --country SE,NO --scheduled-before 2026-12-31
+  nfn calendar list --market SE --event-type earnings_report
+  nfn calendar list --domicile FI
+  nfn calendar list --exchange XSTO,XCSE
   nfn calendar list --watchlist-id a1b2c3d4e5f6
   nfn calendar list --all --format json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,6 +114,12 @@ func buildCalendarParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("country"); v != "" {
 		params.Set("country", v)
 	}
+	if v, _ := cmd.Flags().GetString("market"); v != "" {
+		params.Set("market", v)
+	}
+	if v, _ := cmd.Flags().GetString("domicile"); v != "" {
+		params.Set("domicile", v)
+	}
 	if v, _ := cmd.Flags().GetString("exchange"); v != "" {
 		params.Set("exchange", v)
 	}
@@ -195,8 +204,10 @@ func eventDate(e api.CalendarEvent) string {
 func init() {
 	calendarListCmd.Flags().String("ticker", "", "Filter by company ticker")
 	calendarListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
-	calendarListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2)")
-	calendarListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	calendarListCmd.Flags().String("country", "", "Filter by the event's own country (comma-separated ISO2): the issuer's country, falling back to the source's")
+	calendarListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): issuers with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
+	calendarListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted issuers, excludes foreign-domiciled issuers listed locally")
+	calendarListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	calendarListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	calendarListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	calendarListCmd.Flags().String("event-type", "", "Filter by event type (comma-separated, e.g. earnings_report,dividend)")

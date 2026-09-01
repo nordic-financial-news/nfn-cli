@@ -21,7 +21,9 @@ var companiesListCmd = &cobra.Command{
 	Example: `  nfn companies list --limit 10
   nfn companies list --q "Volvo"
   nfn companies list --country SE --sector Financials
-  nfn companies list --exchange XSTO --listed
+  nfn companies list --exchange XSTO,XCSE --listed
+  nfn companies list --market SE
+  nfn companies list --domicile FI
   nfn companies list --is-active
   nfn companies list --watchlist
   nfn companies list --all --format json`,
@@ -29,42 +31,7 @@ var companiesListCmd = &cobra.Command{
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
-		params := url.Values{}
-		if v, _ := cmd.Flags().GetString("q"); v != "" {
-			params.Set("q", v)
-		}
-		if v, _ := cmd.Flags().GetString("country"); v != "" {
-			params.Set("country", v)
-		}
-		if v, _ := cmd.Flags().GetString("exchange"); v != "" {
-			params.Set("exchange", v)
-		}
-		if v, _ := cmd.Flags().GetString("sector"); v != "" {
-			params.Set("sector", v)
-		}
-		if v, _ := cmd.Flags().GetBool("listed"); v {
-			params.Set("listed", "true")
-		}
-		if v, _ := cmd.Flags().GetBool("watchlist"); v {
-			params.Set("watchlist", "true")
-		}
-		if cmd.Flags().Changed("is-active") {
-			v, _ := cmd.Flags().GetBool("is-active")
-			if v {
-				params.Set("is_active", "true")
-			} else {
-				params.Set("is_active", "false")
-			}
-		}
-		if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
-			params.Set("limit", fmt.Sprintf("%d", v))
-		}
-		if v, _ := cmd.Flags().GetString("cursor"); v != "" {
-			params.Set("cursor", v)
-		}
-		if v, _ := cmd.Flags().GetString("fields"); v != "" {
-			params.Set("fields", v)
-		}
+		params := buildCompanyParams(cmd)
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
@@ -309,6 +276,54 @@ var companiesStoriesCmd = &cobra.Command{
 	},
 }
 
+func buildCompanyParams(cmd *cobra.Command) url.Values {
+	params := url.Values{}
+
+	if v, _ := cmd.Flags().GetString("q"); v != "" {
+		params.Set("q", v)
+	}
+	if v, _ := cmd.Flags().GetString("country"); v != "" {
+		params.Set("country", v)
+	}
+	if v, _ := cmd.Flags().GetString("market"); v != "" {
+		params.Set("market", v)
+	}
+	if v, _ := cmd.Flags().GetString("domicile"); v != "" {
+		params.Set("domicile", v)
+	}
+	if v, _ := cmd.Flags().GetString("exchange"); v != "" {
+		params.Set("exchange", v)
+	}
+	if v, _ := cmd.Flags().GetString("sector"); v != "" {
+		params.Set("sector", v)
+	}
+	if v, _ := cmd.Flags().GetBool("listed"); v {
+		params.Set("listed", "true")
+	}
+	if v, _ := cmd.Flags().GetBool("watchlist"); v {
+		params.Set("watchlist", "true")
+	}
+	if cmd.Flags().Changed("is-active") {
+		v, _ := cmd.Flags().GetBool("is-active")
+		if v {
+			params.Set("is_active", "true")
+		} else {
+			params.Set("is_active", "false")
+		}
+	}
+	if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
+		params.Set("limit", fmt.Sprintf("%d", v))
+	}
+	if v, _ := cmd.Flags().GetString("cursor"); v != "" {
+		params.Set("cursor", v)
+	}
+	if v, _ := cmd.Flags().GetString("fields"); v != "" {
+		params.Set("fields", v)
+	}
+
+	return params
+}
+
 func renderCompanies(f *output.Formatter, companies []api.Company, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
 		result := map[string]interface{}{"companies": companies}
@@ -346,10 +361,12 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 
 func init() {
 	companiesListCmd.Flags().String("q", "", "Search company names and aliases")
-	companiesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
-	companiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	companiesListCmd.Flags().String("country", "", "Filter by legal domicile country code (comma-separated ISO2, e.g. SE,NO); --domicile is the canonical name for the same filter")
+	companiesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
+	companiesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
+	companiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE); requires an active listing on that exchange")
 	companiesListCmd.Flags().String("sector", "", "Filter by sector (e.g. Financials)")
-	companiesListCmd.Flags().Bool("listed", false, "Only show listed companies")
+	companiesListCmd.Flags().Bool("listed", false, "Only show companies with an active stock listing")
 	companiesListCmd.Flags().Bool("is-active", false, "Only show active companies")
 	companiesListCmd.Flags().Bool("watchlist", false, "Only show watchlisted companies")
 	addPaginationFlags(companiesListCmd)

@@ -22,7 +22,9 @@ var storiesListCmd = &cobra.Command{
   nfn stories list --country SE,NO --category "Economic Policy"
   nfn stories list --ticker VOLV-B
   nfn stories list --company cmpny1234567
-  nfn stories list --exchange XSTO --sector Industrials
+  nfn stories list --exchange XSTO,XCSE --sector Industrials
+  nfn stories list --market SE
+  nfn stories list --domicile FI
   nfn stories list --index OMXS30
   nfn stories list --sources abc123,def456
   nfn stories list --listed
@@ -109,6 +111,12 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("country"); v != "" {
 		params.Set("country", v)
 	}
+	if v, _ := cmd.Flags().GetString("market"); v != "" {
+		params.Set("market", v)
+	}
+	if v, _ := cmd.Flags().GetString("domicile"); v != "" {
+		params.Set("domicile", v)
+	}
 	if v, _ := cmd.Flags().GetString("category"); v != "" {
 		params.Set("category", v)
 	}
@@ -178,10 +186,12 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 
 func init() {
 	storiesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
+	storiesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
+	storiesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
 	storiesListCmd.Flags().String("category", "", "Filter by category")
 	storiesListCmd.Flags().String("ticker", "", "Filter by company ticker")
 	storiesListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
-	storiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	storiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	storiesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	storiesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	storiesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")

@@ -18,7 +18,7 @@ var indicesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List stock indices",
 	Example: `  nfn indices list
-  nfn indices list --exchange XSTO
+  nfn indices list --exchange XSTO,XCSE
   nfn indices list --all --format json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
@@ -162,7 +162,7 @@ func renderIndices(f *output.Formatter, indices []api.StockIndex, pagination *ap
 }
 
 func init() {
-	indicesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	indicesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE); matches active exchanges only")
 	addPaginationFlags(indicesListCmd)
 	addFieldsFlag(indicesListCmd)
 

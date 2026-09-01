@@ -22,7 +22,9 @@ var articlesListCmd = &cobra.Command{
   nfn articles list --country SE,NO --category "Economic Policy"
   nfn articles list --ticker VOLV-B --published-after 2025-01-01
   nfn articles list --company cmpny1234567
-  nfn articles list --exchange XSTO --sector Industrials
+  nfn articles list --exchange XSTO,XCSE --sector Industrials
+  nfn articles list --market SE
+  nfn articles list --domicile FI
   nfn articles list --index OMXS30
   nfn articles list --q "battery" --limit 10
   nfn articles list --sources abc123,def456
@@ -124,6 +126,12 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 
 	if v, _ := cmd.Flags().GetString("country"); v != "" {
 		params.Set("country", v)
+	}
+	if v, _ := cmd.Flags().GetString("market"); v != "" {
+		params.Set("market", v)
+	}
+	if v, _ := cmd.Flags().GetString("domicile"); v != "" {
+		params.Set("domicile", v)
 	}
 	if v, _ := cmd.Flags().GetString("category"); v != "" {
 		params.Set("category", v)
@@ -227,10 +235,12 @@ func truncate(s string, max int) string {
 
 func init() {
 	articlesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
+	articlesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
+	articlesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
 	articlesListCmd.Flags().String("category", "", "Filter by category")
 	articlesListCmd.Flags().String("ticker", "", "Filter by company ticker")
 	articlesListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
-	articlesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (e.g. XSTO)")
+	articlesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	articlesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	articlesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	articlesListCmd.Flags().String("content-type", "", "Filter by content type")
