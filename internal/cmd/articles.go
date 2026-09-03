@@ -18,6 +18,11 @@ var articlesCmd = &cobra.Command{
 var articlesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List articles",
+	Long: `List articles.
+
+Note: article title, summary, and key_points are machine-translated and
+AI-paraphrased from the source article. They are not verbatim quotations and
+are not human-verified.`,
 	Example: `  nfn articles list --limit 5
   nfn articles list --country SE,NO --category "Economic Policy"
   nfn articles list --ticker VOLV-B --published-after 2025-01-01
@@ -62,9 +67,14 @@ var articlesListCmd = &cobra.Command{
 var articlesGetCmd = &cobra.Command{
 	Use:   "get <id>",
 	Short: "Get article details",
+	Long: `Get article details.
+
+Note: title, summary, and key_points are machine-translated and AI-paraphrased
+from the source article. They are not verbatim quotations and are not
+human-verified. Use the article_url / URL field to reach the original source.`,
 	Example: `  nfn articles get bvnozwnshtp8
   nfn articles get bvnozwnshtp8 --format json`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)

@@ -80,11 +80,21 @@ var calendarGetCmd = &cobra.Command{
 			{Key: "Fiscal Period", Value: event.FiscalPeriod},
 			{Key: "Scheduled", Value: event.LocalTime},
 			{Key: "Timezone", Value: event.Timezone},
-			{Key: "Company", Value: event.CompanyID},
+		}
+
+		if event.Company != nil && event.Company.Name != "" {
+			fields = append(fields, output.Field{Key: "Company", Value: event.Company.Name})
+			if event.Company.Ticker != "" {
+				fields = append(fields, output.Field{Key: "Company Ticker", Value: event.Company.Ticker})
+			}
+		}
+
+		fields = append(fields, []output.Field{
+			{Key: "Company ID", Value: event.CompanyID},
 			{Key: "Country", Value: event.Country},
 			{Key: "Source Article", Value: event.SourceArticleID},
 			{Key: "Updated", Value: event.UpdatedAt},
-		}
+		}...)
 
 		if event.Dividend != nil {
 			d := event.Dividend
@@ -178,13 +188,23 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 	columns := []string{"ID", "Date", "Type", "Title", "Company", "Status"}
 	rows := make([][]string, len(events))
 	for i, e := range events {
-		rows[i] = []string{e.ID, eventDate(e), e.EventType, truncate(e.Title, 60), e.CompanyID, e.Status}
+		rows[i] = []string{e.ID, eventDate(e), e.EventType, truncate(e.Title, 60), eventCompany(e), e.Status}
 	}
 	f.Render(columns, rows)
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
 	return nil
+}
+
+// eventCompany returns the display value for the Company column: the inlined
+// issuer name (returned by default), falling back to the raw company_id when the
+// issuer is withheld or a narrowing --fields selection dropped the company object.
+func eventCompany(e api.CalendarEvent) string {
+	if e.Company != nil && e.Company.Name != "" {
+		return truncate(e.Company.Name, 30)
+	}
+	return e.CompanyID
 }
 
 // eventDate returns the local calendar date (YYYY-MM-DD) for an event. The API

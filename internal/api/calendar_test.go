@@ -25,7 +25,13 @@ func TestListCalendarEvents(t *testing.T) {
 					"id":         "cale_q3volvo1",
 					"title":      "Volvo AB Q3 2026 interim report",
 					"event_type": "earnings_report",
-					"dividend":   nil,
+					"company_id": "64hn2d7ul6kr",
+					"company": map[string]interface{}{
+						"id":     "64hn2d7ul6kr",
+						"name":   "Volvo AB",
+						"ticker": "VOLV-B",
+					},
+					"dividend": nil,
 				},
 				{
 					"id":         "cale_dividlim1",
@@ -59,6 +65,21 @@ func TestListCalendarEvents(t *testing.T) {
 	}
 	if events[0].Dividend != nil {
 		t.Errorf("non-dividend event Dividend = %+v, want nil", events[0].Dividend)
+	}
+	if events[0].CompanyID != "64hn2d7ul6kr" {
+		t.Errorf("CompanyID = %q, want %q", events[0].CompanyID, "64hn2d7ul6kr")
+	}
+	if events[0].Company == nil {
+		t.Fatal("inline Company = nil, want populated object")
+	}
+	if events[0].Company.Name != "Volvo AB" {
+		t.Errorf("Company.Name = %q, want %q", events[0].Company.Name, "Volvo AB")
+	}
+	if events[0].Company.Ticker != "VOLV-B" {
+		t.Errorf("Company.Ticker = %q, want %q", events[0].Company.Ticker, "VOLV-B")
+	}
+	if events[1].Company != nil {
+		t.Errorf("event without inline company = %+v, want nil", events[1].Company)
 	}
 	if events[1].Dividend == nil {
 		t.Fatal("dividend event Dividend = nil, want populated object")

@@ -147,6 +147,46 @@ func TestBuildCalendarParams(t *testing.T) {
 	}
 }
 
+func TestEventCompany(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		event api.CalendarEvent
+		want  string
+	}{
+		{
+			name:  "prefers inline company name",
+			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{ID: "cmpny1234567", Name: "Telefonaktiebolaget LM Ericsson", Ticker: "ERIC-B"}},
+			want:  "Telefonaktiebolaget LM Eric...",
+		},
+		{
+			name:  "falls back to company_id when no inline company",
+			event: api.CalendarEvent{CompanyID: "cmpny1234567"},
+			want:  "cmpny1234567",
+		},
+		{
+			name:  "falls back to company_id when inline company has no name",
+			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{ID: "cmpny1234567"}},
+			want:  "cmpny1234567",
+		},
+		{
+			name:  "short name returned in full",
+			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{Name: "Volvo"}},
+			want:  "Volvo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := eventCompany(tt.event); got != tt.want {
+				t.Errorf("eventCompany() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestEventDate(t *testing.T) {
 	t.Parallel()
 

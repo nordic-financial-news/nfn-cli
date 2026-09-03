@@ -26,6 +26,21 @@ func TestBuildCompanyParams(t *testing.T) {
 			wantKV: map[string]string{"q": "Volvo"},
 		},
 		{
+			name:   "ticker batch lookup accepts comma-separated list",
+			flags:  map[string]string{"ticker": "VOLV-B,ERIC-B"},
+			wantKV: map[string]string{"ticker": "VOLV-B,ERIC-B"},
+		},
+		{
+			name:   "company batch lookup accepts comma-separated ids",
+			flags:  map[string]string{"company": "64hn2d7ul6kr,7f3k9m2p1q8r"},
+			wantKV: map[string]string{"company": "64hn2d7ul6kr,7f3k9m2p1q8r"},
+		},
+		{
+			name:   "ticker and company intersect when both sent",
+			flags:  map[string]string{"ticker": "VOLV-B", "company": "64hn2d7ul6kr"},
+			wantKV: map[string]string{"ticker": "VOLV-B", "company": "64hn2d7ul6kr"},
+		},
+		{
 			name:   "country flag",
 			flags:  map[string]string{"country": "SE,NO"},
 			wantKV: map[string]string{"country": "SE,NO"},
@@ -87,6 +102,8 @@ func TestBuildCompanyParams(t *testing.T) {
 			cmd := *companiesListCmd
 			cmd.ResetFlags()
 			cmd.Flags().String("q", "", "")
+			cmd.Flags().String("ticker", "", "")
+			cmd.Flags().String("company", "", "")
 			cmd.Flags().String("country", "", "")
 			cmd.Flags().String("market", "", "")
 			cmd.Flags().String("domicile", "", "")
@@ -199,6 +216,8 @@ func TestBuildCompanyParamsIsActive(t *testing.T) {
 			cmd := *companiesListCmd
 			cmd.ResetFlags()
 			cmd.Flags().String("q", "", "")
+			cmd.Flags().String("ticker", "", "")
+			cmd.Flags().String("company", "", "")
 			cmd.Flags().String("country", "", "")
 			cmd.Flags().String("market", "", "")
 			cmd.Flags().String("domicile", "", "")

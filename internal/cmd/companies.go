@@ -20,6 +20,8 @@ var companiesListCmd = &cobra.Command{
 	Short: "List companies",
 	Example: `  nfn companies list --limit 10
   nfn companies list --q "Volvo"
+  nfn companies list --ticker VOLV-B,ERIC-B
+  nfn companies list --company 64hn2d7ul6kr,7f3k9m2p1q8r
   nfn companies list --country SE --sector Financials
   nfn companies list --exchange XSTO,XCSE --listed
   nfn companies list --market SE
@@ -56,7 +58,7 @@ var companiesGetCmd = &cobra.Command{
 	Long:  "Get company details. The identifier can be a company ID or ticker symbol.",
 	Example: `  nfn companies get VOLV-B
   nfn companies get 64hn2d7ul6kr --format json`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
@@ -211,7 +213,7 @@ var companiesArticlesCmd = &cobra.Command{
   nfn companies articles VOLV-B --primary-only
   nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01
   nfn companies articles VOLV-B --q "battery" --sort latest --all`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
@@ -246,7 +248,7 @@ var companiesStoriesCmd = &cobra.Command{
 	Example: `  nfn companies stories VOLV-B --limit 5
   nfn companies stories VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01
   nfn companies stories VOLV-B --q "battery" --sort latest --all`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
@@ -277,6 +279,12 @@ func buildCompanyParams(cmd *cobra.Command) url.Values {
 
 	if v, _ := cmd.Flags().GetString("q"); v != "" {
 		params.Set("q", v)
+	}
+	if v, _ := cmd.Flags().GetString("ticker"); v != "" {
+		params.Set("ticker", v)
+	}
+	if v, _ := cmd.Flags().GetString("company"); v != "" {
+		params.Set("company", v)
 	}
 	if v, _ := cmd.Flags().GetString("country"); v != "" {
 		params.Set("country", v)
@@ -357,6 +365,8 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 
 func init() {
 	companiesListCmd.Flags().String("q", "", "Search company names and aliases")
+	companiesListCmd.Flags().String("ticker", "", "Look up companies by ticker (comma-separated, max 25, e.g. VOLV-B,ERIC-B): an exact filter that resolves former and exchange-suffixed tickers; every value must resolve or the request errors")
+	companiesListCmd.Flags().String("company", "", "Look up companies by ID (comma-separated, max 25): an exact filter; every value must resolve or the request errors")
 	companiesListCmd.Flags().String("country", "", "Filter by legal domicile country code (comma-separated ISO2, e.g. SE,NO); --domicile is the canonical name for the same filter")
 	companiesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
 	companiesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
