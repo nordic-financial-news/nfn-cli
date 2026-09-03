@@ -88,6 +88,21 @@ func TestBuildArticleParams(t *testing.T) {
 			wantKV: map[string]string{"watchlist": "a1b2c3d4e5f6"},
 		},
 		{
+			name:   "sort flag",
+			flags:  map[string]string{"sort": "latest"},
+			wantKV: map[string]string{"sort": "latest"},
+		},
+		{
+			name:   "primary-only bool maps to primary_only true",
+			bools:  map[string]bool{"primary-only": true},
+			wantKV: map[string]string{"primary_only": "true"},
+		},
+		{
+			name:   "ticker accepts comma-separated list",
+			flags:  map[string]string{"ticker": "VOLV-B,ERIC-B"},
+			wantKV: map[string]string{"ticker": "VOLV-B,ERIC-B"},
+		},
+		{
 			name:   "country accepts comma-separated list",
 			flags:  map[string]string{"country": "SE,NO"},
 			wantKV: map[string]string{"country": "SE,NO"},
@@ -165,11 +180,13 @@ func TestBuildArticleParams(t *testing.T) {
 			cmd.Flags().String("published-before", "", "")
 			cmd.Flags().String("updated-after", "", "")
 			cmd.Flags().String("q", "", "")
+			cmd.Flags().String("sort", "", "")
 			cmd.Flags().String("ids", "", "")
 			cmd.Flags().String("sources", "", "")
 			cmd.Flags().String("source-type", "", "")
 			cmd.Flags().Bool("listed", false, "")
 			cmd.Flags().String("watchlist-id", "", "")
+			cmd.Flags().Bool("primary-only", false, "")
 			cmd.Flags().Int("limit", 0, "")
 			cmd.Flags().String("cursor", "", "")
 			cmd.Flags().String("fields", "", "")

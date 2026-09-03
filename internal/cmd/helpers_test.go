@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"errors"
+	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
+	"github.com/spf13/cobra"
 )
 
 func TestWatchlistFilterError(t *testing.T) {
@@ -47,6 +49,71 @@ func TestWatchlistFilterError(t *testing.T) {
 		t.Parallel()
 		if got := watchlistFilterError(nil, "wl_abc"); got != nil {
 			t.Errorf("expected nil, got %v", got)
+		}
+	})
+}
+
+func TestSetContentFilters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("copies registered flags with flag-to-param translation", func(t *testing.T) {
+		t.Parallel()
+		cmd := &cobra.Command{}
+		cmd.Flags().String("q", "", "")
+		cmd.Flags().String("sort", "", "")
+		cmd.Flags().String("source-type", "", "")
+		cmd.Flags().String("published-after", "", "")
+		_ = cmd.Flags().Set("q", "battery")
+		_ = cmd.Flags().Set("sort", "latest")
+		_ = cmd.Flags().Set("source-type", "stock_exchange")
+		_ = cmd.Flags().Set("published-after", "2026-01-01")
+
+		params := url.Values{}
+		setContentFilters(params, cmd)
+
+		want := map[string]string{
+			"q":               "battery",
+			"sort":            "latest",
+			"source_type":     "stock_exchange",
+			"published_after": "2026-01-01",
+		}
+		for k, v := range want {
+			if got := params.Get(k); got != v {
+				t.Errorf("params[%q] = %q, want %q", k, got, v)
+			}
+		}
+	})
+
+	t.Run("never sets a filter the command did not register", func(t *testing.T) {
+		t.Parallel()
+		// Mirrors the story routes, which register neither source-type nor content-type.
+		cmd := &cobra.Command{}
+		cmd.Flags().String("q", "", "")
+		_ = cmd.Flags().Set("q", "battery")
+
+		params := url.Values{}
+		setContentFilters(params, cmd)
+
+		if params.Has("source_type") {
+			t.Errorf("source_type set for a command that did not register --source-type")
+		}
+		if params.Has("content_type") {
+			t.Errorf("content_type set for a command that did not register --content-type")
+		}
+	})
+
+	t.Run("skips registered but empty flags", func(t *testing.T) {
+		t.Parallel()
+		cmd := &cobra.Command{}
+		cmd.Flags().String("q", "", "")
+		cmd.Flags().String("sort", "", "")
+		_ = cmd.Flags().Set("q", "battery")
+
+		params := url.Values{}
+		setContentFilters(params, cmd)
+
+		if params.Has("sort") {
+			t.Errorf("sort set from an unset flag")
 		}
 	})
 }

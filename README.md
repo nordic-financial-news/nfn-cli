@@ -36,6 +36,17 @@ export NFN_API_KEY=your-api-key
 nfn articles list --limit 5
 ```
 
+## AI Agent Integration
+
+`nfn` works with any AI agent that can run shell commands.
+Point your agent at [`skills/nfn-cli/SKILL.md`](skills/nfn-cli/SKILL.md) for Nordic financial news workflow coverage.
+
+```bash
+npx skills add https://github.com/nordic-financial-news/nfn-cli/skills/nfn-cli
+```
+
+**Agent discovery:** Use `nfn commands` for the full command catalog as structured JSON (flags, arguments, examples, related commands).
+
 ## Commands
 
 | Command | Description |
@@ -78,17 +89,6 @@ Use `nfn <command> --help` for all available flags.
 - Override with `--format table` or `--format json`
 
 If your plan restricts a list result, the response carries `data.plan_limited: true` in JSON (and a note under the table), so a capped result is distinguishable from a genuinely short one.
-
-## AI Agent Integration
-
-`nfn` works with any AI agent that can run shell commands.
-Point your agent at [`skills/nfn-cli/SKILL.md`](skills/nfn-cli/SKILL.md) for Nordic financial news workflow coverage.
-
-```bash
-npx skills add https://github.com/nordic-financial-news/nfn-cli/skills/nfn-cli
-```
-
-**Agent discovery:** Use `nfn commands` for the full command catalog as structured JSON (flags, arguments, examples, related commands).
 
 ## License
 

@@ -108,7 +108,7 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 10. **Exchange codes are MIC codes** — use `XSTO` for Stockholm, `XCSE` for Copenhagen, `XHEL` for Helsinki, `XOSL` for Oslo. Run `nfn exchanges list` if unsure. `--exchange` accepts a comma-separated list of MICs to cover several venues in one call, e.g. `--exchange XSTO,XCSE`. Reach for `--market SE` instead when you want a whole national market rather than named venues. Note that `--exchange` matches only active listings (and, on `nfn indices list`, only active exchanges) — a company whose sole listing on that exchange is delisted will not appear.
 
-11. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones).
+11. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones). Both `--ticker` and `--company` accept a comma-separated list (max 25, matching any of the named companies), e.g. `--ticker VOLV-B,ERIC-B`. Every value must resolve: an unknown ticker or ID now fails the whole request with a `400` naming the offending value (e.g. `Unknown ticker(s): VOLVB`) rather than silently returning an empty list. The other company-selecting filters (`--exchange`, `--market`, `--domicile`) still narrow silently on an unknown code.
 
 12. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
 
@@ -163,7 +163,9 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by country | `nfn articles list --country SE,NO` |
 | Filter by category | `nfn articles list --category "Economic Policy"` |
 | Filter by ticker | `nfn articles list --ticker VOLV-B` |
+| Filter by several tickers | `nfn articles list --ticker VOLV-B,ERIC-B` |
 | Filter by company ID | `nfn articles list --company <id>` |
+| Only primary-company articles | `nfn articles list --ticker VOLV-B --primary-only` |
 | Filter by exchange | `nfn articles list --exchange XSTO,XCSE` |
 | Filter by listing market | `nfn articles list --market SE` |
 | Filter by legal domicile | `nfn articles list --domicile FI` |
@@ -173,6 +175,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by source type | `nfn articles list --source-type stock_exchange,wire_service` |
 | Filter by date range | `nfn articles list --published-after 2025-01-01 --published-before 2025-06-01` |
 | Search articles by text | `nfn articles list --q "battery"` |
+| Search, newest-first, all pages | `nfn articles list --q "battery" --sort latest --all` |
 | Only listed companies | `nfn articles list --listed` |
 | Filter by watchlist | `nfn articles list --watchlist-id <id>` |
 | Filter by content type | `nfn articles list --content-type "press release"` |
@@ -183,7 +186,11 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | List stories | `nfn stories list --format json` |
 | Filter stories by country | `nfn stories list --country SE,NO` |
 | Filter stories by category | `nfn stories list --category "Mergers & Acquisitions"` |
+| Search stories by text | `nfn stories list --q "battery"` |
+| Search, newest-first, all pages | `nfn stories list --q "battery" --sort latest --all` |
+| Filter stories by date range | `nfn stories list --published-after 2026-01-01 --published-before 2026-06-01` |
 | Filter stories by ticker | `nfn stories list --ticker VOLV-B` |
+| Filter stories by several tickers | `nfn stories list --ticker VOLV-B,ERIC-B` |
 | Filter stories by company ID | `nfn stories list --company <id>` |
 | Filter stories by exchange | `nfn stories list --exchange XSTO,XCSE` |
 | Filter stories by listing market | `nfn stories list --market SE` |
@@ -219,7 +226,10 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Get company details | `nfn companies get VOLV-B --format json` |
 | Company articles | `nfn companies articles VOLV-B --limit 5` |
 | Primary articles only | `nfn companies articles VOLV-B --primary-only` |
+| Company articles, filtered | `nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01` |
+| Company articles, search | `nfn companies articles VOLV-B --q "battery" --sort latest --all` |
 | Company stories | `nfn companies stories VOLV-B --limit 5` |
+| Company stories, filtered | `nfn companies stories VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01` |
 | **Exchanges** | |
 | List exchanges | `nfn exchanges list --format json` |
 | Filter by country | `nfn exchanges list --country SE` |
@@ -264,8 +274,12 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 ```
 Looking for news?
 ├── Know the ticker or company ID? → nfn companies articles VOLV-B
+│   ├── Narrow that company's own feed? → nfn companies articles VOLV-B --category "M&A" --published-after 2026-01-01
+│   ├── Search within it? → nfn companies articles VOLV-B --q "battery" --sort latest
+│   └── Drop passing mentions? → nfn companies articles VOLV-B --primary-only
 ├── Know the company name but not identifier? → nfn companies list --q "Volvo"
 │   └── Multiple matches? → Ask user or note which entity you're using
+├── Several companies at once? → nfn articles list --ticker VOLV-B,ERIC-B
 ├── Know the topic? → nfn search "topic" --type articles
 ├── Want a specific country? → nfn articles list --country SE
 ├── Want a whole national market (all its venues)? → nfn articles list --market SE
@@ -358,6 +372,14 @@ nfn companies stories VOLV-B --limit 5 --format json
 # When you already know the ticker or company ID, go directly
 nfn companies articles VOLV-B --limit 10 --format json
 nfn companies stories VOLV-B --limit 5 --format json
+
+# The company feed takes the same filters as the flat feeds, scoped to that company:
+# by category and date range...
+nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01 --format json
+# ...or a full-text search of the company's own coverage, newest first, all pages
+nfn companies articles VOLV-B --q "battery" --sort latest --all --format json
+# Drop articles where the company is only a passing mention
+nfn companies articles VOLV-B --primary-only --format json
 ```
 
 ### Search for news on a topic

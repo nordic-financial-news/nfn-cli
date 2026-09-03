@@ -83,6 +83,63 @@ func addFieldsFlag(cmd *cobra.Command) {
 	cmd.Flags().String("fields", "", "Comma-separated list of fields to include")
 }
 
+// contentFilterFlags maps CLI flag names to their query-param names for the
+// content filters shared across the article and story feeds and the nested
+// company routes. A command participates simply by registering the flag; only
+// flags a command both registered and the user set are copied, so a route never
+// sends a filter it does not support (e.g. source-type/content-type stay off the
+// story routes, which do not register them).
+var contentFilterFlags = []struct{ flag, param string }{
+	{"q", "q"},
+	{"sort", "sort"},
+	{"country", "country"},
+	{"category", "category"},
+	{"sources", "sources"},
+	{"source-type", "source_type"},
+	{"content-type", "content_type"},
+	{"published-after", "published_after"},
+	{"published-before", "published_before"},
+	{"updated-after", "updated_after"},
+	{"fields", "fields"},
+}
+
+// setContentFilters copies each registered, non-empty content filter flag from
+// cmd into params, translating the flag name to its query-param name.
+func setContentFilters(params url.Values, cmd *cobra.Command) {
+	for _, f := range contentFilterFlags {
+		if cmd.Flags().Lookup(f.flag) == nil {
+			continue
+		}
+		if v, _ := cmd.Flags().GetString(f.flag); v != "" {
+			params.Set(f.param, v)
+		}
+	}
+}
+
+// setPaginationParams copies the --limit and --cursor flags into params.
+func setPaginationParams(params url.Values, cmd *cobra.Command) {
+	if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
+		params.Set("limit", fmt.Sprintf("%d", v))
+	}
+	if v, _ := cmd.Flags().GetString("cursor"); v != "" {
+		params.Set("cursor", v)
+	}
+}
+
+// addCompanyNewsFilterFlags registers the content filters shared by the nested
+// company article and story routes (item 9 filter parity). Callers that also
+// need source-type/content-type (articles only) register those separately.
+func addCompanyNewsFilterFlags(cmd *cobra.Command) {
+	cmd.Flags().String("q", "", "Search query (relevance-ranked single page; add --sort latest for newest-first with cursor paging)")
+	cmd.Flags().String("sort", "", "Sort order (e.g. latest)")
+	cmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
+	cmd.Flags().String("category", "", "Filter by category")
+	cmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
+	cmd.Flags().String("published-after", "", "Filter by published after date")
+	cmd.Flags().String("published-before", "", "Filter by published before date")
+	cmd.Flags().String("updated-after", "", "ISO 8601 datetime for incremental sync")
+}
+
 // planLimitedNote is printed under table output when the caller's plan hid
 // records from the result, so a capped result isn't mistaken for a short one.
 const planLimitedNote = "Note: results limited by your plan — some records were hidden."

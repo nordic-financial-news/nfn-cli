@@ -128,6 +128,53 @@ func TestBuildCompanyParams(t *testing.T) {
 	}
 }
 
+// TestCompanyNewsRoutesRegisterFilterFlags pins the item 9 filter-parity contract
+// for the nested company article/story routes: they gain the flat-feed content
+// filters, but must not expose params the /companies/{id}/... API now rejects.
+func TestCompanyNewsRoutesRegisterFilterFlags(t *testing.T) {
+	t.Parallel()
+
+	articleFilters := []string{
+		"q", "sort", "country", "category", "sources", "source-type",
+		"content-type", "published-after", "published-before", "updated-after",
+		"fields", "primary-only",
+	}
+	for _, name := range articleFilters {
+		if companiesArticlesCmd.Flags().Lookup(name) == nil {
+			t.Errorf("companies articles missing --%s flag", name)
+		}
+	}
+
+	storyFilters := []string{
+		"q", "sort", "country", "category", "sources",
+		"published-after", "published-before", "updated-after", "fields",
+	}
+	for _, name := range storyFilters {
+		if companiesStoriesCmd.Flags().Lookup(name) == nil {
+			t.Errorf("companies stories missing --%s flag", name)
+		}
+	}
+
+	// The /stories API does not accept source-type/content-type; the route must not offer them.
+	for _, name := range []string{"source-type", "content-type"} {
+		if companiesStoriesCmd.Flags().Lookup(name) != nil {
+			t.Errorf("companies stories unexpectedly registers --%s (the API rejects it)", name)
+		}
+	}
+
+	// The nested routes describe one company via the path, so the company-selecting
+	// filters the API now 400s on must not be exposed on either route.
+	rejected := []string{"ticker", "company", "watchlist-id", "listed", "exchange", "market", "domicile", "index", "sector"}
+	for _, name := range rejected {
+		if companiesArticlesCmd.Flags().Lookup(name) != nil {
+			t.Errorf("companies articles unexpectedly registers rejected filter --%s", name)
+		}
+		if companiesStoriesCmd.Flags().Lookup(name) != nil {
+			t.Errorf("companies stories unexpectedly registers rejected filter --%s", name)
+		}
+	}
+}
+
 // is-active is the one companies filter that forwards an explicit false, so it
 // is exercised separately from the table above.
 func TestBuildCompanyParamsIsActive(t *testing.T) {

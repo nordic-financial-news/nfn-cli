@@ -85,6 +85,21 @@ func TestBuildStoryParams(t *testing.T) {
 			flags:  map[string]string{"country": "SE", "market": "NO", "domicile": "DK"},
 			wantKV: map[string]string{"country": "SE", "market": "NO", "domicile": "DK"},
 		},
+		{
+			name:   "q and sort flags",
+			flags:  map[string]string{"q": "battery", "sort": "latest"},
+			wantKV: map[string]string{"q": "battery", "sort": "latest"},
+		},
+		{
+			name:   "published-after and published-before map to underscores",
+			flags:  map[string]string{"published-after": "2025-01-01", "published-before": "2025-06-01"},
+			wantKV: map[string]string{"published_after": "2025-01-01", "published_before": "2025-06-01"},
+		},
+		{
+			name:   "ticker accepts comma-separated list",
+			flags:  map[string]string{"ticker": "VOLV-B,ERIC-B"},
+			wantKV: map[string]string{"ticker": "VOLV-B,ERIC-B"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -97,6 +112,10 @@ func TestBuildStoryParams(t *testing.T) {
 			cmd.Flags().String("market", "", "")
 			cmd.Flags().String("domicile", "", "")
 			cmd.Flags().String("category", "", "")
+			cmd.Flags().String("q", "", "")
+			cmd.Flags().String("sort", "", "")
+			cmd.Flags().String("published-after", "", "")
+			cmd.Flags().String("published-before", "", "")
 			cmd.Flags().String("ticker", "", "")
 			cmd.Flags().String("company", "", "")
 			cmd.Flags().String("exchange", "", "")

@@ -21,12 +21,15 @@ var articlesListCmd = &cobra.Command{
 	Example: `  nfn articles list --limit 5
   nfn articles list --country SE,NO --category "Economic Policy"
   nfn articles list --ticker VOLV-B --published-after 2025-01-01
+  nfn articles list --ticker VOLV-B,ERIC-B
+  nfn articles list --ticker VOLV-B --primary-only
   nfn articles list --company cmpny1234567
   nfn articles list --exchange XSTO,XCSE --sector Industrials
   nfn articles list --market SE
   nfn articles list --domicile FI
   nfn articles list --index OMXS30
   nfn articles list --q "battery" --limit 10
+  nfn articles list --q "battery" --sort latest --all
   nfn articles list --sources abc123,def456
   nfn articles list --source-type stock_exchange,wire_service
   nfn articles list --listed
@@ -123,18 +126,13 @@ var articlesGetCmd = &cobra.Command{
 
 func buildArticleParams(cmd *cobra.Command) url.Values {
 	params := url.Values{}
+	setContentFilters(params, cmd)
 
-	if v, _ := cmd.Flags().GetString("country"); v != "" {
-		params.Set("country", v)
-	}
 	if v, _ := cmd.Flags().GetString("market"); v != "" {
 		params.Set("market", v)
 	}
 	if v, _ := cmd.Flags().GetString("domicile"); v != "" {
 		params.Set("domicile", v)
-	}
-	if v, _ := cmd.Flags().GetString("category"); v != "" {
-		params.Set("category", v)
 	}
 	if v, _ := cmd.Flags().GetString("ticker"); v != "" {
 		params.Set("ticker", v)
@@ -151,29 +149,8 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
 	}
-	if v, _ := cmd.Flags().GetString("content-type"); v != "" {
-		params.Set("content_type", v)
-	}
-	if v, _ := cmd.Flags().GetString("published-after"); v != "" {
-		params.Set("published_after", v)
-	}
-	if v, _ := cmd.Flags().GetString("published-before"); v != "" {
-		params.Set("published_before", v)
-	}
-	if v, _ := cmd.Flags().GetString("updated-after"); v != "" {
-		params.Set("updated_after", v)
-	}
-	if v, _ := cmd.Flags().GetString("q"); v != "" {
-		params.Set("q", v)
-	}
 	if v, _ := cmd.Flags().GetString("ids"); v != "" {
 		params.Set("ids", v)
-	}
-	if v, _ := cmd.Flags().GetString("sources"); v != "" {
-		params.Set("sources", v)
-	}
-	if v, _ := cmd.Flags().GetString("source-type"); v != "" {
-		params.Set("source_type", v)
 	}
 	if v, _ := cmd.Flags().GetBool("listed"); v {
 		params.Set("listed", "true")
@@ -181,15 +158,10 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("watchlist-id"); v != "" {
 		params.Set("watchlist", v)
 	}
-	if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
-		params.Set("limit", fmt.Sprintf("%d", v))
+	if v, _ := cmd.Flags().GetBool("primary-only"); v {
+		params.Set("primary_only", "true")
 	}
-	if v, _ := cmd.Flags().GetString("cursor"); v != "" {
-		params.Set("cursor", v)
-	}
-	if v, _ := cmd.Flags().GetString("fields"); v != "" {
-		params.Set("fields", v)
-	}
+	setPaginationParams(params, cmd)
 
 	return params
 }
@@ -238,8 +210,8 @@ func init() {
 	articlesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
 	articlesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
 	articlesListCmd.Flags().String("category", "", "Filter by category")
-	articlesListCmd.Flags().String("ticker", "", "Filter by company ticker")
-	articlesListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
+	articlesListCmd.Flags().String("ticker", "", "Filter by company ticker (comma-separated, max 25, e.g. VOLV-B,ERIC-B); every value must resolve or the request errors")
+	articlesListCmd.Flags().String("company", "", "Filter by company ID (comma-separated, max 25; reaches unlisted companies with no ticker); every value must resolve or the request errors")
 	articlesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	articlesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	articlesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
@@ -247,12 +219,14 @@ func init() {
 	articlesListCmd.Flags().String("published-after", "", "Filter by published after date")
 	articlesListCmd.Flags().String("published-before", "", "Filter by published before date")
 	articlesListCmd.Flags().String("updated-after", "", "ISO 8601 datetime for incremental sync")
-	articlesListCmd.Flags().String("q", "", "Search query")
+	articlesListCmd.Flags().String("q", "", "Search query (relevance-ranked single page; add --sort latest for newest-first with cursor paging)")
+	articlesListCmd.Flags().String("sort", "", "Sort order (e.g. latest)")
 	articlesListCmd.Flags().String("ids", "", "Comma-separated article IDs")
 	articlesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
 	articlesListCmd.Flags().String("source-type", "", "Filter by source type (comma-separated: news_publication, wire_service, press_release, government, trade_publication, blog, stock_exchange, research)")
 	articlesListCmd.Flags().Bool("listed", false, "Only show articles about listed companies")
 	articlesListCmd.Flags().String("watchlist-id", "", "Only show articles for companies in this watchlist (see 'nfn watchlists list')")
+	articlesListCmd.Flags().Bool("primary-only", false, "Only articles where the matched company is the primary subject, not a passing mention (requires --ticker, --company, or --watchlist-id)")
 	addPaginationFlags(articlesListCmd)
 	addFieldsFlag(articlesListCmd)
 

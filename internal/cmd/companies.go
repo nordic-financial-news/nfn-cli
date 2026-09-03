@@ -208,19 +208,17 @@ var companiesArticlesCmd = &cobra.Command{
 	Use:   "articles <identifier>",
 	Short: "List articles for a company",
 	Example: `  nfn companies articles VOLV-B --limit 5
-  nfn companies articles VOLV-B --primary-only`,
+  nfn companies articles VOLV-B --primary-only
+  nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01
+  nfn companies articles VOLV-B --q "battery" --sort latest --all`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
 		params := url.Values{}
-		if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
-			params.Set("limit", fmt.Sprintf("%d", v))
-		}
-		if v, _ := cmd.Flags().GetString("cursor"); v != "" {
-			params.Set("cursor", v)
-		}
+		setContentFilters(params, cmd)
+		setPaginationParams(params, cmd)
 		if v, _ := cmd.Flags().GetBool("primary-only"); v {
 			params.Set("primary_only", "true")
 		}
@@ -245,19 +243,17 @@ var companiesArticlesCmd = &cobra.Command{
 var companiesStoriesCmd = &cobra.Command{
 	Use:   "stories <identifier>",
 	Short: "List stories for a company",
-	Example: `  nfn companies stories VOLV-B --limit 5`,
+	Example: `  nfn companies stories VOLV-B --limit 5
+  nfn companies stories VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01
+  nfn companies stories VOLV-B --q "battery" --sort latest --all`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
 		params := url.Values{}
-		if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
-			params.Set("limit", fmt.Sprintf("%d", v))
-		}
-		if v, _ := cmd.Flags().GetString("cursor"); v != "" {
-			params.Set("cursor", v)
-		}
+		setContentFilters(params, cmd)
+		setPaginationParams(params, cmd)
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
@@ -374,8 +370,14 @@ func init() {
 
 	addPaginationFlags(companiesArticlesCmd)
 	companiesArticlesCmd.Flags().Bool("primary-only", false, "Only show articles where this is the primary company")
+	addCompanyNewsFilterFlags(companiesArticlesCmd)
+	companiesArticlesCmd.Flags().String("source-type", "", "Filter by source type (comma-separated: news_publication, wire_service, press_release, government, trade_publication, blog, stock_exchange, research)")
+	companiesArticlesCmd.Flags().String("content-type", "", "Filter by content type")
+	addFieldsFlag(companiesArticlesCmd)
 
 	addPaginationFlags(companiesStoriesCmd)
+	addCompanyNewsFilterFlags(companiesStoriesCmd)
+	addFieldsFlag(companiesStoriesCmd)
 
 	companiesCmd.AddCommand(companiesListCmd)
 	companiesCmd.AddCommand(companiesGetCmd)

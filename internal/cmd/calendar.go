@@ -202,8 +202,8 @@ func eventDate(e api.CalendarEvent) string {
 }
 
 func init() {
-	calendarListCmd.Flags().String("ticker", "", "Filter by company ticker")
-	calendarListCmd.Flags().String("company", "", "Filter by company ID (reaches unlisted companies with no ticker)")
+	calendarListCmd.Flags().String("ticker", "", "Filter by company ticker (comma-separated, max 25, e.g. VOLV-B,ERIC-B); every value must resolve or the request errors")
+	calendarListCmd.Flags().String("company", "", "Filter by company ID (comma-separated, max 25; reaches unlisted companies with no ticker); every value must resolve or the request errors")
 	calendarListCmd.Flags().String("country", "", "Filter by the event's own country (comma-separated ISO2): the issuer's country, falling back to the source's")
 	calendarListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): issuers with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
 	calendarListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted issuers, excludes foreign-domiciled issuers listed locally")
