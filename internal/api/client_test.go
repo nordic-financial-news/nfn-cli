@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -311,6 +312,43 @@ func TestGet_RateLimited_NoInfiniteRetry(t *testing.T) {
 	}
 }
 
+// A 429 whose Retry-After exceeds maxRetryAfter is reported immediately rather
+// than slept through. The semantic search budget is hourly, so waiting a capped
+// 60s there would only delay the same failure.
+func TestGet_RateLimited_LongRetryAfterNotRetried(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	srv := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(429)
+		_, _ = w.Write([]byte(`{"title":"Rate limited"}`))
+	})
+
+	c := NewClient("key", WithBaseURL(srv.URL))
+	start := time.Now()
+	_, err := c.Get(context.Background(), "/test", nil, nil)
+	elapsed := time.Since(start)
+
+	if calls != 1 {
+		t.Errorf("calls = %d, want 1 (no retry)", calls)
+	}
+	if elapsed > 5*time.Second {
+		t.Errorf("elapsed = %v, want an immediate return", elapsed)
+	}
+
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err = %v, want *APIError", err)
+	}
+	if !apiErr.IsRateLimited() {
+		t.Errorf("IsRateLimited() = false, want true")
+	}
+	if apiErr.RetryAfter != 3600*time.Second {
+		t.Errorf("RetryAfter = %v, want 1h0m0s", apiErr.RetryAfter)
+	}
+}
+
 func TestGet_Unauthorized(t *testing.T) {
 	t.Parallel()
 	srv := testServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -402,7 +440,8 @@ func TestParseRetryAfter(t *testing.T) {
 		{name: "zero", value: "0", want: 0},
 		{name: "five", value: "5", want: 5 * time.Second},
 		{name: "invalid", value: "abc", want: 1 * time.Second},
-		{name: "capped at 60s", value: "999999", want: 60 * time.Second},
+		{name: "long wait reported in full", value: "999999", want: 999999 * time.Second},
+		{name: "negative treated as unparseable", value: "-5", want: 1 * time.Second},
 	}
 
 	for _, tt := range tests {

@@ -25,6 +25,9 @@ type Company struct {
 	AlsoListedOn  []OtherListing  `json:"also_listed_on,omitempty"`
 	Registry      *Registry       `json:"registry,omitempty"`
 	UpdatedAt     string          `json:"updated_at,omitempty"`
+	// Distance is the raw cosine distance to the query on a semantic search
+	// result. See Article.Distance.
+	Distance *float64 `json:"distance,omitempty"`
 }
 
 // OtherListing is one of a company's other active stock listings, pairing a

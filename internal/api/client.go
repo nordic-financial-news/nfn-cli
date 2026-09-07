@@ -105,8 +105,13 @@ func (c *Client) doGet(ctx context.Context, path string, params url.Values, resu
 		RateLimitInfo: rateLimitInfo,
 	}
 
-	if resp.StatusCode == http.StatusTooManyRequests && retryOn429 {
-		retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
+	retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
+
+	// Absorb a 429 by waiting it out, but only when the wait is short. Semantic
+	// search draws on an hourly budget, so its Retry-After routinely runs into
+	// the thousands of seconds; sleeping a capped 60s there would just delay
+	// the same failure. A long window is reported to the caller instead.
+	if resp.StatusCode == http.StatusTooManyRequests && retryOn429 && retryAfter <= maxRetryAfter {
 		timer := time.NewTimer(retryAfter)
 		defer timer.Stop()
 		select {
@@ -119,7 +124,7 @@ func (c *Client) doGet(ctx context.Context, path string, params url.Values, resu
 
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		apiErr := &APIError{StatusCode: resp.StatusCode}
+		apiErr := &APIError{StatusCode: resp.StatusCode, RetryAfter: retryAfter}
 		if json.Unmarshal(body, apiErr) != nil {
 			apiErr.Detail = string(body)
 		}
@@ -179,18 +184,19 @@ func parseRateLimitHeaders(h http.Header) *RateLimitInfo {
 	return info
 }
 
+// maxRetryAfter is the longest wait the client will absorb on a 429 before
+// handing the error back rather than blocking the caller.
 const maxRetryAfter = 60 * time.Second
 
+// parseRetryAfter reads a Retry-After header as a duration, uncapped. A missing
+// or unparseable value falls back to a second, matching the API's standard
+// rate-limit window.
 func parseRetryAfter(value string) time.Duration {
 	if value == "" {
 		return 1 * time.Second
 	}
-	if seconds, err := strconv.Atoi(value); err == nil {
-		d := time.Duration(seconds) * time.Second
-		if d > maxRetryAfter {
-			return maxRetryAfter
-		}
-		return d
+	if seconds, err := strconv.Atoi(value); err == nil && seconds >= 0 {
+		return time.Duration(seconds) * time.Second
 	}
 	return 1 * time.Second
 }

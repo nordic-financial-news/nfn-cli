@@ -118,6 +118,19 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 15. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
 
+13. **Use `--semantic` when the request is thematic, not lexical** — `nfn articles list`, `nfn stories list`, and `nfn companies list` accept `--semantic`, which matches `--q` by meaning (embedding similarity) instead of keywords. Reach for it when the user describes a theme rather than a term: "defence contract wins and capacity expansion" finds relevant results that share no words with the query. Stick with plain `--q` when they gave you a name, ticker, or exact phrase — lexical search is better at those and costs nothing extra.
+
+    - `--q` is required and must be 2-200 characters.
+    - Every other filter still applies as a hard filter, so `--semantic` composes with `--country`, `--market`, `--sector`, date ranges and the rest.
+    - Results are a **single page ranked by closeness**. There is no cursor, so `--all`, `--cursor`, and `--updated-after` are rejected; `--sort` is rejected too, because semantic mode defines its own ranking. Use `--limit` to size the page.
+    - **A short page does not mean the archive is thin.** A server-side relevance floor drops weak matches, so a semantic page is frequently shorter than `--limit` and can come back empty — a 25-limit query returning 1 row is normal and means "only one thing cleared the bar", not "coverage is missing". Do not report a small semantic result as evidence that little was published; re-run without `--semantic`, or widen the query, before drawing that conclusion. This is separate from `plan_limited` (invariant 12): the floor shortens a page on any plan, so check `plan_limited` to tell the two causes apart.
+    - Each result carries `distance`: the raw cosine distance to the query, lower being closer. Articles and stories are ordered by distance blended with a small recency bonus, so equally close matches come out newest-first, while the reported `distance` stays raw. Companies blend distance with a small coverage bonus, so a well-covered company outranks an equally close but barely-covered one. In table mode this appears as a `Distance` column.
+    - **What each type matches on:** articles match their summarized text; stories match title, summary and key entities only — the narrative content is *not* part of the match, so a detail that appears only in the body won't be found; companies match name, aliases, country, sector, industry and description.
+    - **Keep geography out of `--q` on companies.** A place name in the query matches company *names* containing it ("Nordic ...", "Swedish ...") ahead of companies that actually do the thing. Put it in `--market`, `--domicile` or `--country`, which apply as hard filters before the match.
+    - Semantic requests come from a **separate budget of 120 per hour per API key**, shared across articles, stories, and companies. Don't spray semantic queries where one would do.
+    - It never silently falls back to keyword matching: if the backend is down the command fails rather than returning lexical results, so a success is always a genuine semantic result.
+    - On stories, a plan's story cap clamps the size of the semantic result, so a capped plan gets its closest matches rather than its newest stories. Check `plan_limited` as usual.
+
 ### Output Modes
 
 | Goal | Flag | What you get |
@@ -182,6 +195,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by date range | `nfn articles list --published-after 2025-01-01 --published-before 2025-06-01` |
 | Search articles by text | `nfn articles list --q "battery"` |
 | Search, newest-first, all pages | `nfn articles list --q "battery" --sort latest --all` |
+| Search articles by meaning | `nfn articles list --q "capacity expansion" --semantic` |
 | Only listed companies | `nfn articles list --listed` |
 | Filter by watchlist | `nfn articles list --watchlist-id <id>` |
 | Filter by content type | `nfn articles list --content-type "press release"` |
@@ -204,6 +218,8 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter stories by index | `nfn stories list --index OMXS30` |
 | Filter stories by sector | `nfn stories list --sector Industrials` |
 | Filter stories by source | `nfn stories list --sources <id1,id2>` |
+| Search stories by text | `nfn stories list --q "battery"` |
+| Search stories by meaning | `nfn stories list --q "supply chain disruption" --semantic` |
 | Only listed companies | `nfn stories list --listed` |
 | Filter by watchlist | `nfn stories list --watchlist-id <id>` |
 | Get story details | `nfn stories get <id> --format json` |
@@ -226,6 +242,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Search companies | `nfn companies list --q "Volvo"` |
 | Batch lookup by ticker | `nfn companies list --ticker VOLV-B,ERIC-B` |
 | Batch lookup by ID | `nfn companies list --company <id1,id2>` |
+| Search companies by meaning | `nfn companies list --q "offshore wind installation" --semantic` |
 | Filter by exchange | `nfn companies list --exchange XSTO,XCSE` |
 | Filter by listing market | `nfn companies list --market SE` |
 | Filter by legal domicile | `nfn companies list --domicile SE` |
@@ -290,6 +307,8 @@ Looking for news?
 │   └── Multiple matches? → Ask user or note which entity you're using
 ├── Several companies at once? → nfn articles list --ticker VOLV-B,ERIC-B
 ├── Know the topic? → nfn search "topic" --type articles
+├── Know the exact word or name? → nfn articles list --q "battery"
+├── Know the theme but not the words? → nfn articles list --q "capacity expansion" --semantic
 ├── Want a specific country? → nfn articles list --country SE
 ├── Want a whole national market (all its venues)? → nfn articles list --market SE
 ├── Want companies legally domiciled somewhere? → nfn articles list --domicile SE
@@ -314,6 +333,7 @@ Looking for news?
 Looking for a company?
 ├── Know the ticker or company ID? → nfn companies get VOLV-B
 ├── Know part of the name? → nfn companies list --q "Volvo"
+├── Know what it does but not its name? → nfn companies list --q "offshore wind installation" --semantic
 │   └── Multiple matches? → Show user the options, ask which one they mean
 ├── Want companies on an exchange? → nfn exchanges companies XSTO
 ├── Want companies in an index? → nfn indices companies OMXS30
@@ -399,6 +419,28 @@ nfn search "battery" --format json
 
 # Or search just articles with text query
 nfn articles list --q "battery" --limit 10 --format json
+```
+
+### Search by meaning rather than keyword
+
+```bash
+# Lexical: matches the word "battery"
+nfn articles list --q "battery" --limit 10 --format json
+
+# Semantic: matches the idea, including results that never say these words
+nfn articles list --q "defence contract wins and capacity expansion" \
+  --semantic --limit 10 --format json
+
+# Filters still apply as hard filters alongside the semantic match
+nfn articles list --q "grid capacity constraints" --semantic \
+  --market SE --published-after 2026-01-01 --format json
+
+# Find companies by what they do rather than what they are called
+nfn companies list --q "offshore wind turbine installation" --semantic --format json
+
+# Results are one page ranked by closeness; read the distances directly
+nfn articles list --q "cost cutting programmes" --semantic --format json \
+  | jq '.data.articles[] | {title, distance}'
 ```
 
 ### Explore an exchange

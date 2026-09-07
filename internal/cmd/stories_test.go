@@ -61,6 +61,11 @@ func TestBuildStoryParams(t *testing.T) {
 			wantKV: map[string]string{"limit": "25"},
 		},
 		{
+			name:   "q flag",
+			flags:  map[string]string{"q": "battery"},
+			wantKV: map[string]string{"q": "battery"},
+		},
+		{
 			name:   "market flag",
 			flags:  map[string]string{"market": "SE"},
 			wantKV: map[string]string{"market": "SE"},
@@ -122,6 +127,7 @@ func TestBuildStoryParams(t *testing.T) {
 			cmd.Flags().String("index", "", "")
 			cmd.Flags().String("sector", "", "")
 			cmd.Flags().String("sources", "", "")
+			cmd.Flags().Bool("semantic", false, "")
 			cmd.Flags().Bool("listed", false, "")
 			cmd.Flags().String("watchlist-id", "", "")
 			cmd.Flags().Int("limit", 0, "")

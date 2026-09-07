@@ -35,6 +35,7 @@ are not human-verified.`,
   nfn articles list --index OMXS30
   nfn articles list --q "battery" --limit 10
   nfn articles list --q "battery" --sort latest --all
+  nfn articles list --q "defence contract wins and capacity expansion" --semantic
   nfn articles list --sources abc123,def456
   nfn articles list --source-type stock_exchange,wire_service
   nfn articles list --listed
@@ -44,8 +45,13 @@ are not human-verified.`,
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
+		if err := validateSemantic(cmd); err != nil {
+			return err
+		}
+
 		params := buildArticleParams(cmd)
 		watchlistID, _ := cmd.Flags().GetString("watchlist-id")
+		semantic := semanticRequested(cmd)
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
@@ -58,7 +64,7 @@ are not human-verified.`,
 
 		articles, pagination, resp, err := client.ListArticles(cmd.Context(), params)
 		if err != nil {
-			return watchlistFilterError(err, watchlistID)
+			return semanticError(watchlistFilterError(err, watchlistID), semantic)
 		}
 		return renderArticles(f, articles, pagination, planLimitedFrom(resp))
 	},
@@ -159,6 +165,9 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
 	}
+	if v, _ := cmd.Flags().GetBool("semantic"); v {
+		params.Set("mode", "semantic")
+	}
 	if v, _ := cmd.Flags().GetString("ids"); v != "" {
 		params.Set("ids", v)
 	}
@@ -191,7 +200,20 @@ func renderArticles(f *output.Formatter, articles []api.Article, pagination *api
 		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
+	// Only a semantic search returns distances, so the column appears only when
+	// the results actually carry them.
+	showDistance := false
+	for _, a := range articles {
+		if a.Distance != nil {
+			showDistance = true
+			break
+		}
+	}
+
 	columns := []string{"ID", "Title", "Country", "Source", "Published"}
+	if showDistance {
+		columns = append(columns, "Distance")
+	}
 	rows := make([][]string, len(articles))
 	for i, a := range articles {
 		source := ""
@@ -199,6 +221,9 @@ func renderArticles(f *output.Formatter, articles []api.Article, pagination *api
 			source = a.Source.Name
 		}
 		rows[i] = []string{a.ID, truncate(a.Title, 60), a.Country, source, a.PublishedAt}
+		if showDistance {
+			rows[i] = append(rows[i], formatDistance(a.Distance))
+		}
 	}
 	f.Render(columns, rows)
 	if isPlanLimited(planLimited) {
@@ -239,6 +264,7 @@ func init() {
 	articlesListCmd.Flags().Bool("primary-only", false, "Only articles where the matched company is the primary subject, not a passing mention (requires --ticker, --company, or --watchlist-id)")
 	addPaginationFlags(articlesListCmd)
 	addFieldsFlag(articlesListCmd)
+	addSemanticFlag(articlesListCmd)
 
 	articlesCmd.AddCommand(articlesListCmd)
 	articlesCmd.AddCommand(articlesGetCmd)

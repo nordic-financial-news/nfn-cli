@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
 	"github.com/nordic-financial-news/nfn-cli/internal/config"
@@ -138,6 +140,97 @@ func addCompanyNewsFilterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("published-after", "", "Filter by published after date")
 	cmd.Flags().String("published-before", "", "Filter by published before date")
 	cmd.Flags().String("updated-after", "", "ISO 8601 datetime for incremental sync")
+}
+
+// semanticMinQuery and semanticMaxQuery bound the query the API accepts in
+// semantic mode. Checking them here turns a wasted round trip into an
+// immediate message, and semantic requests come from a small hourly budget.
+const (
+	semanticMinQuery = 2
+	semanticMaxQuery = 200
+)
+
+func addSemanticFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("semantic", false, "Match --q by meaning rather than by keyword, ranking results by embedding similarity; requires --q (2-200 characters) and returns a single page with a distance on each result")
+}
+
+// semanticRequested reports whether --semantic was asked for on a command that
+// offers it.
+func semanticRequested(cmd *cobra.Command) bool {
+	v, _ := cmd.Flags().GetBool("semantic")
+	return v
+}
+
+// semanticConflicts are the flags the API refuses alongside mode=semantic,
+// each with the reason it cannot apply. A semantic response is a single
+// distance-ranked page, so the flags that walk pages or ask for incremental
+// slices have nothing to act on, and --sort would override the ranking that
+// semantic mode exists to produce.
+var semanticConflicts = []struct{ flag, because string }{
+	{"cursor", "semantic results are a single page ranked by closeness, with no cursor to follow"},
+	{"all", "semantic results are a single page ranked by closeness, with no cursor to follow"},
+	{"updated-after", "semantic results are a single page ranked by closeness, with no cursor to follow"},
+	{"sort", "semantic mode defines its own ranking by closeness to the query"},
+}
+
+// validateSemantic enforces the constraints the API places on semantic mode,
+// before a request is spent against the hourly semantic budget.
+func validateSemantic(cmd *cobra.Command) error {
+	if !semanticRequested(cmd) {
+		return nil
+	}
+
+	q, _ := cmd.Flags().GetString("q")
+	if strings.TrimSpace(q) == "" {
+		return fmt.Errorf("--semantic needs a query to match against: add --q \"...\"")
+	}
+	if n := len([]rune(q)); n < semanticMinQuery || n > semanticMaxQuery {
+		return fmt.Errorf("--semantic requires --q between %d and %d characters (got %d)", semanticMinQuery, semanticMaxQuery, n)
+	}
+
+	for _, c := range semanticConflicts {
+		f := cmd.Flags().Lookup(c.flag)
+		if f != nil && f.Changed {
+			return fmt.Errorf("--%s cannot be combined with --semantic: %s", c.flag, c.because)
+		}
+	}
+
+	return nil
+}
+
+// semanticError rewrites the two failures specific to semantic search into
+// messages that say what to do next. Other errors pass through unchanged.
+func semanticError(err error, semantic bool) error {
+	if err == nil || !semantic {
+		return err
+	}
+
+	var apiErr *api.APIError
+	if !errors.As(err, &apiErr) {
+		return err
+	}
+
+	switch {
+	case apiErr.IsSemanticUnavailable():
+		return fmt.Errorf("semantic search is temporarily unavailable (the API returned 503). It never falls back to keyword matching, so either retry shortly or drop --semantic to run the same query lexically")
+	case apiErr.IsRateLimited():
+		msg := "rate limited by the API (429). Semantic requests draw on their own budget of 120 per hour per API key, shared across articles, stories, and companies and separate from the standard rate limit, so this may be that budget rather than the usual one"
+		if apiErr.RetryAfter > 0 {
+			msg += fmt.Sprintf(" — retry in %s", apiErr.RetryAfter.Round(time.Second))
+		}
+		return errors.New(msg)
+	}
+
+	return err
+}
+
+// formatDistance renders a semantic distance for table output. The API rounds
+// to four decimal places and lower is closer; a lexical result has none.
+func formatDistance(d *float64) string {
+	if d == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*d, 'f', 4, 64)
 }
 
 // planLimitedNote is printed under table output when the caller's plan hid

@@ -1,6 +1,11 @@
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+)
 
 // APIError represents an error response from the API, following RFC 9457 problem detail.
 type APIError struct {
@@ -9,6 +14,10 @@ type APIError struct {
 	Title      string `json:"title,omitempty"`
 	Detail     string `json:"detail,omitempty"`
 	Instance   string `json:"instance,omitempty"`
+	// RetryAfter is the wait advertised by the response's Retry-After header,
+	// zero when it sent none. It is the value as received, uncapped, so a
+	// caller can report an hour-long window truthfully.
+	RetryAfter time.Duration `json:"-"`
 }
 
 func (e *APIError) Error() string {
@@ -31,4 +40,14 @@ func (e *APIError) IsForbidden() bool {
 
 func (e *APIError) IsRateLimited() bool {
 	return e.StatusCode == 429
+}
+
+// IsSemanticUnavailable reports whether a semantic search failed because the
+// embedding backend was unreachable. The API answers 503 with problem type
+// "semantic-unavailable" rather than quietly falling back to lexical matching,
+// so a 200 always means a genuine semantic result. The type is matched as a
+// substring because it is delivered as a URI reference.
+func (e *APIError) IsSemanticUnavailable() bool {
+	return e.StatusCode == http.StatusServiceUnavailable &&
+		strings.Contains(e.Type, "semantic-unavailable")
 }

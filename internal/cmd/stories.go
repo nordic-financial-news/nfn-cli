@@ -29,6 +29,7 @@ var storiesListCmd = &cobra.Command{
   nfn stories list --index OMXS30
   nfn stories list --q "battery" --sort latest --all
   nfn stories list --sources abc123,def456
+  nfn stories list --q "supply chain disruption" --semantic
   nfn stories list --listed
   nfn stories list --watchlist-id a1b2c3d4e5f6
   nfn stories list --all --format json`,
@@ -36,8 +37,13 @@ var storiesListCmd = &cobra.Command{
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
+		if err := validateSemantic(cmd); err != nil {
+			return err
+		}
+
 		params := buildStoryParams(cmd)
 		watchlistID, _ := cmd.Flags().GetString("watchlist-id")
+		semantic := semanticRequested(cmd)
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
@@ -50,7 +56,7 @@ var storiesListCmd = &cobra.Command{
 
 		stories, pagination, resp, err := client.ListStories(cmd.Context(), params)
 		if err != nil {
-			return watchlistFilterError(err, watchlistID)
+			return semanticError(watchlistFilterError(err, watchlistID), semantic)
 		}
 		return renderStories(f, stories, pagination, planLimitedFrom(resp))
 	},
@@ -132,6 +138,9 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
 	}
+	if v, _ := cmd.Flags().GetBool("semantic"); v {
+		params.Set("mode", "semantic")
+	}
 	if v, _ := cmd.Flags().GetBool("listed"); v {
 		params.Set("listed", "true")
 	}
@@ -158,10 +167,26 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
+	// Only a semantic search returns distances, so the column appears only when
+	// the results actually carry them.
+	showDistance := false
+	for _, s := range stories {
+		if s.Distance != nil {
+			showDistance = true
+			break
+		}
+	}
+
 	columns := []string{"ID", "Title", "Country", "Articles", "Published"}
+	if showDistance {
+		columns = append(columns, "Distance")
+	}
 	rows := make([][]string, len(stories))
 	for i, s := range stories {
 		rows[i] = []string{s.ID, truncate(s.Title, 60), s.Country, fmt.Sprintf("%d", s.ArticleCount), s.PublishedAt}
+		if showDistance {
+			rows[i] = append(rows[i], formatDistance(s.Distance))
+		}
 	}
 	f.Render(columns, rows)
 	if isPlanLimited(planLimited) {
@@ -189,6 +214,7 @@ func init() {
 	storiesListCmd.Flags().String("watchlist-id", "", "Only show stories for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(storiesListCmd)
 	addFieldsFlag(storiesListCmd)
+	addSemanticFlag(storiesListCmd)
 
 	storiesCmd.AddCommand(storiesListCmd)
 	storiesCmd.AddCommand(storiesGetCmd)

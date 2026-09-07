@@ -18,6 +18,9 @@ type Story struct {
 	CompanyIDs   []string  `json:"company_ids,omitempty"`
 	Companies    []Company `json:"companies,omitempty"`
 	Category     *Category `json:"category"`
+	// Distance is the raw cosine distance to the query on a semantic search
+	// result. See Article.Distance.
+	Distance *float64 `json:"distance,omitempty"`
 }
 
 func (c *Client) ListStories(ctx context.Context, params url.Values) ([]Story, *Pagination, *Response, error) {

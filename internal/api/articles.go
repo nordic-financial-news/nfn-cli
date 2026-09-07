@@ -21,6 +21,11 @@ type Article struct {
 	CompanyIDs  []string  `json:"company_ids,omitempty"`
 	Country     string    `json:"country"`
 	KeyPoints   []string  `json:"key_points,omitempty"`
+	// Distance is the raw cosine distance to the query, present only on
+	// results from a semantic search (--semantic). Lower is closer. It is a
+	// pointer because a lexical result carries no distance at all, which is
+	// distinct from a distance that happens to be 0.
+	Distance *float64 `json:"distance,omitempty"`
 }
 
 type Category struct {

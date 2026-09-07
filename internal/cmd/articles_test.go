@@ -184,6 +184,7 @@ func TestBuildArticleParams(t *testing.T) {
 			cmd.Flags().String("ids", "", "")
 			cmd.Flags().String("sources", "", "")
 			cmd.Flags().String("source-type", "", "")
+			cmd.Flags().Bool("semantic", false, "")
 			cmd.Flags().Bool("listed", false, "")
 			cmd.Flags().String("watchlist-id", "", "")
 			cmd.Flags().Bool("primary-only", false, "")

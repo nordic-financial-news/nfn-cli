@@ -22,6 +22,7 @@ var companiesListCmd = &cobra.Command{
   nfn companies list --q "Volvo"
   nfn companies list --ticker VOLV-B,ERIC-B
   nfn companies list --company 64hn2d7ul6kr,7f3k9m2p1q8r
+  nfn companies list --q "offshore wind turbine installation" --semantic
   nfn companies list --country SE --sector Financials
   nfn companies list --exchange XSTO,XCSE --listed
   nfn companies list --market SE
@@ -33,7 +34,12 @@ var companiesListCmd = &cobra.Command{
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
+		if err := validateSemantic(cmd); err != nil {
+			return err
+		}
+
 		params := buildCompanyParams(cmd)
+		semantic := semanticRequested(cmd)
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
@@ -46,7 +52,7 @@ var companiesListCmd = &cobra.Command{
 
 		companies, pagination, resp, err := client.ListCompanies(cmd.Context(), params)
 		if err != nil {
-			return err
+			return semanticError(err, semantic)
 		}
 		return renderCompanies(f, companies, pagination, planLimitedFrom(resp))
 	},
@@ -286,6 +292,9 @@ func buildCompanyParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("company"); v != "" {
 		params.Set("company", v)
 	}
+	if v, _ := cmd.Flags().GetBool("semantic"); v {
+		params.Set("mode", "semantic")
+	}
 	if v, _ := cmd.Flags().GetString("country"); v != "" {
 		params.Set("country", v)
 	}
@@ -343,7 +352,20 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
+	// Only a semantic search returns distances, so the column appears only when
+	// the results actually carry them.
+	showDistance := false
+	for _, c := range companies {
+		if c.Distance != nil {
+			showDistance = true
+			break
+		}
+	}
+
 	columns := []string{"ID", "Name", "Ticker", "Exchange", "Active"}
+	if showDistance {
+		columns = append(columns, "Distance")
+	}
 	rows := make([][]string, len(companies))
 	for i, c := range companies {
 		exchange := ""
@@ -355,6 +377,9 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 			active = "Yes"
 		}
 		rows[i] = []string{c.ID, c.Name, c.TickerSymbol, exchange, active}
+		if showDistance {
+			rows[i] = append(rows[i], formatDistance(c.Distance))
+		}
 	}
 	f.Render(columns, rows)
 	if isPlanLimited(planLimited) {
@@ -377,6 +402,7 @@ func init() {
 	companiesListCmd.Flags().Bool("watchlist", false, "Only show watchlisted companies")
 	addPaginationFlags(companiesListCmd)
 	addFieldsFlag(companiesListCmd)
+	addSemanticFlag(companiesListCmd)
 
 	addPaginationFlags(companiesArticlesCmd)
 	companiesArticlesCmd.Flags().Bool("primary-only", false, "Only show articles where this is the primary company")
