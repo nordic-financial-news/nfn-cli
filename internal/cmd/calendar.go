@@ -22,6 +22,7 @@ var calendarListCmd = &cobra.Command{
   nfn calendar list --company cmpny1234567
   nfn calendar list --event-type earnings_report,dividend
   nfn calendar list --country SE,NO --scheduled-before 2026-12-31
+  nfn calendar list --scheduled-after 2026-10-01 --scheduled-before 2026-10-31
   nfn calendar list --market SE --event-type earnings_report
   nfn calendar list --domicile FI
   nfn calendar list --exchange XSTO,XCSE
@@ -232,8 +233,8 @@ func init() {
 	calendarListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
 	calendarListCmd.Flags().String("event-type", "", "Filter by event type (comma-separated, e.g. earnings_report,dividend)")
 	calendarListCmd.Flags().String("status", "", "Filter by status (scheduled, published, cancelled)")
-	calendarListCmd.Flags().String("scheduled-after", "", "Only events scheduled on or after this date (ISO 8601)")
-	calendarListCmd.Flags().String("scheduled-before", "", "Only events scheduled before this date (ISO 8601)")
+	calendarListCmd.Flags().String("scheduled-after", "", "Start of the scheduled-time window. A bare date (2026-10-01) is that calendar date in the issuer's own timezone, inclusive; an ISO 8601 datetime (2026-10-01T00:00:00Z, or with a UTC offset) is that exact instant, at or after")
+	calendarListCmd.Flags().String("scheduled-before", "", "End of the scheduled-time window. A bare date (2026-10-31) is that calendar date in the issuer's own timezone, inclusive of the whole day; an ISO 8601 datetime (2026-11-01T00:00:00Z, or with a UTC offset) is that exact instant, strictly before")
 	calendarListCmd.Flags().String("updated-after", "", "ISO 8601 datetime for incremental sync")
 	calendarListCmd.Flags().String("watchlist-id", "", "Only show events for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(calendarListCmd)

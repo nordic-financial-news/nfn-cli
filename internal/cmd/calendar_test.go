@@ -48,6 +48,21 @@ func TestBuildCalendarParams(t *testing.T) {
 			wantKV: map[string]string{"scheduled_before": "2026-12-31"},
 		},
 		{
+			name:   "bare-date scheduled window passes through verbatim",
+			flags:  map[string]string{"scheduled-after": "2026-10-01", "scheduled-before": "2026-10-31"},
+			wantKV: map[string]string{"scheduled_after": "2026-10-01", "scheduled_before": "2026-10-31"},
+		},
+		{
+			name:   "datetime scheduled window passes through verbatim",
+			flags:  map[string]string{"scheduled-after": "2026-10-01T00:00:00Z", "scheduled-before": "2026-11-01T00:00:00Z"},
+			wantKV: map[string]string{"scheduled_after": "2026-10-01T00:00:00Z", "scheduled_before": "2026-11-01T00:00:00Z"},
+		},
+		{
+			name:   "datetime with UTC offset passes through verbatim",
+			flags:  map[string]string{"scheduled-after": "2026-10-01T00:00:00+02:00"},
+			wantKV: map[string]string{"scheduled_after": "2026-10-01T00:00:00+02:00"},
+		},
+		{
 			name:   "updated-after maps to updated_after",
 			flags:  map[string]string{"updated-after": "2026-03-01T00:00:00Z"},
 			wantKV: map[string]string{"updated_after": "2026-03-01T00:00:00Z"},

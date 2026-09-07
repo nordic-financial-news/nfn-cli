@@ -114,7 +114,9 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 13. **Calendar rows carry the issuer inline** — each calendar event has `company_id` plus, by default, an inline `company` object (`id`, `name`, `ticker`), so you don't need a separate `nfn companies get` per row to render the issuer. The table's Company column shows the name (falling back to the id if the issuer is withheld); read `data.calendar_events[].company` in JSON for the full object. `ticker` is `null` for an unlisted issuer. Note that `--fields` *narrows* the response to `id` plus the fields you name, so `--fields company` returns only the issuer and drops title/date/etc. — don't use it just to get the name, which is already there.
 
-14. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
+14. **Calendar date windows are issuer-local when you pass a bare date** — on `nfn calendar list`, `--scheduled-after` / `--scheduled-before` read a bare date (`2026-10-01`) as that calendar date in the *issuer's own* timezone, inclusive at both ends, so `--scheduled-after 2026-10-01 --scheduled-before 2026-10-31` returns October for every issuer regardless of where they sit relative to UTC. Day-precision events (earnings dates, AGMs, dividends given only as a date) are stored at the issuer's local midnight, so this is what you want in almost every case — do not widen the window by a day and filter on `local_time` yourself. Pass a full ISO 8601 datetime (`2026-11-01T00:00:00Z`, or with a UTC offset like `+02:00`) only when you genuinely mean an exact instant: `--scheduled-after` is then at-or-after and `--scheduled-before` is *strictly before* that instant. A datetime is **not** a shortcut to an exclusive calendar end — `--scheduled-before 2026-07-01T00:00:00Z` still picks up a 1 July event for an issuer ahead of UTC, because its local midnight (`2026-06-30T22:00:00Z` in Sweden) falls before the UTC one. For a window that means calendar days, use the bare-date form.
+
+15. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
 
 ### Output Modes
 
@@ -211,7 +213,8 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Filter by company ID | `nfn calendar list --company <id>` |
 | Filter by event type | `nfn calendar list --event-type earnings_report,dividend` |
 | Filter by status | `nfn calendar list --status scheduled` |
-| Filter by date range | `nfn calendar list --scheduled-after 2026-01-01 --scheduled-before 2026-06-30` |
+| Filter by date range (issuer-local, inclusive) | `nfn calendar list --scheduled-after 2026-01-01 --scheduled-before 2026-06-30` |
+| Cut at an exact UTC instant (not a local calendar day) | `nfn calendar list --scheduled-before 2026-07-01T00:00:00Z` |
 | Filter by event country | `nfn calendar list --country SE,NO` |
 | Filter by listing market | `nfn calendar list --market SE` |
 | Filter by legal domicile | `nfn calendar list --domicile FI` |
