@@ -11,7 +11,7 @@ import (
 var categoriesCmd = &cobra.Command{
 	Use:   "categories",
 	Short: "List article categories",
-	Long:  "List all available article categories. Use category names to filter articles and stories.",
+	Long:  "List all available article categories. Use a category ID with --category to filter articles and stories.",
 	Example: `  nfn categories
   nfn categories --format json`,
 	Args: cobra.NoArgs,

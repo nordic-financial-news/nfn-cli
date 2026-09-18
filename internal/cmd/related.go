@@ -52,8 +52,8 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 		{Description: "View source article", Command: "nfn articles get <id>"},
 	},
 	"nfn categories": {
-		{Description: "Filter articles by category", Command: "nfn articles list --category <name>"},
-		{Description: "Filter stories by category", Command: "nfn stories list --category <name>"},
+		{Description: "Filter articles by category", Command: "nfn articles list --category <id>"},
+		{Description: "Filter stories by category", Command: "nfn stories list --category <id>"},
 	},
 	"nfn countries list": {
 		{Description: "View country details", Command: "nfn countries get <code>"},

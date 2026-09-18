@@ -19,7 +19,7 @@ var storiesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List stories",
 	Example: `  nfn stories list --limit 5
-  nfn stories list --country SE,NO --category "Economic Policy"
+  nfn stories list --country SE,NO --category <category-id>
   nfn stories list --ticker VOLV-B
   nfn stories list --ticker VOLV-B,ERIC-B
   nfn stories list --company cmpny1234567
@@ -199,7 +199,7 @@ func init() {
 	storiesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	storiesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
 	storiesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
-	storiesListCmd.Flags().String("category", "", "Filter by category")
+	storiesListCmd.Flags().String("category", "", "Filter by category ID from nfn categories (comma-separated for several; unknown IDs are ignored)")
 	storiesListCmd.Flags().String("q", "", "Search query (relevance-ranked single page; add --sort latest for newest-first with cursor paging)")
 	storiesListCmd.Flags().String("sort", "", "Sort order (e.g. latest)")
 	storiesListCmd.Flags().String("published-after", "", "Filter by published after date")

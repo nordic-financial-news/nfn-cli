@@ -24,7 +24,7 @@ Note: article title, summary, and key_points are machine-translated and
 AI-paraphrased from the source article. They are not verbatim quotations and
 are not human-verified.`,
 	Example: `  nfn articles list --limit 5
-  nfn articles list --country SE,NO --category "Economic Policy"
+  nfn articles list --country SE,NO --category <category-id>
   nfn articles list --ticker VOLV-B --published-after 2025-01-01
   nfn articles list --ticker VOLV-B,ERIC-B
   nfn articles list --ticker VOLV-B --primary-only
@@ -244,7 +244,7 @@ func init() {
 	articlesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	articlesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")
 	articlesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
-	articlesListCmd.Flags().String("category", "", "Filter by category")
+	articlesListCmd.Flags().String("category", "", "Filter by category ID from nfn categories (comma-separated for several; unknown IDs are ignored)")
 	articlesListCmd.Flags().String("ticker", "", "Filter by company ticker (comma-separated, max 25, e.g. VOLV-B,ERIC-B); every value must resolve or the request errors")
 	articlesListCmd.Flags().String("company", "", "Filter by company ID (comma-separated, max 25; reaches unlisted companies with no ticker); every value must resolve or the request errors")
 	articlesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")

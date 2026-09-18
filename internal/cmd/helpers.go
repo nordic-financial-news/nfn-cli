@@ -135,7 +135,7 @@ func addCompanyNewsFilterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("q", "", "Search query (relevance-ranked single page; add --sort latest for newest-first with cursor paging)")
 	cmd.Flags().String("sort", "", "Sort order (e.g. latest)")
 	cmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
-	cmd.Flags().String("category", "", "Filter by category")
+	cmd.Flags().String("category", "", "Filter by category ID from nfn categories (comma-separated for several; unknown IDs are ignored)")
 	cmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
 	cmd.Flags().String("published-after", "", "Filter by published after date")
 	cmd.Flags().String("published-before", "", "Filter by published before date")

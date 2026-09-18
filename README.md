@@ -26,7 +26,7 @@ nfn search "Volvo"
 nfn companies get VOLV-B
 
 # Filter articles by country and category
-nfn articles list --country SE --category "Earnings & Financial Results"
+nfn articles list --country SE --category <category-id>
 
 # Pipe-friendly — outputs JSON automatically when not in a terminal
 nfn articles list --limit 10 | jq '.data.articles[].title'

@@ -180,7 +180,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | **Articles** | |
 | List articles | `nfn articles list --format json` |
 | Filter by country | `nfn articles list --country SE,NO` |
-| Filter by category | `nfn articles list --category "Economic Policy"` |
+| Filter by category | `nfn articles list --category <category-id>` |
 | Filter by ticker | `nfn articles list --ticker VOLV-B` |
 | Filter by several tickers | `nfn articles list --ticker VOLV-B,ERIC-B` |
 | Filter by company ID | `nfn articles list --company <id>` |
@@ -205,7 +205,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | **Stories** | |
 | List stories | `nfn stories list --format json` |
 | Filter stories by country | `nfn stories list --country SE,NO` |
-| Filter stories by category | `nfn stories list --category "Mergers & Acquisitions"` |
+| Filter stories by category | `nfn stories list --category <category-id>` |
 | Search stories by text | `nfn stories list --q "battery"` |
 | Search, newest-first, all pages | `nfn stories list --q "battery" --sort latest --all` |
 | Filter stories by date range | `nfn stories list --published-after 2026-01-01 --published-before 2026-06-01` |
@@ -252,10 +252,10 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Get company details | `nfn companies get VOLV-B --format json` |
 | Company articles | `nfn companies articles VOLV-B --limit 5` |
 | Primary articles only | `nfn companies articles VOLV-B --primary-only` |
-| Company articles, filtered | `nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01` |
+| Company articles, filtered | `nfn companies articles VOLV-B --category <category-id> --published-after 2026-01-01` |
 | Company articles, search | `nfn companies articles VOLV-B --q "battery" --sort latest --all` |
 | Company stories | `nfn companies stories VOLV-B --limit 5` |
-| Company stories, filtered | `nfn companies stories VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01` |
+| Company stories, filtered | `nfn companies stories VOLV-B --category <category-id> --published-after 2026-01-01` |
 | **Exchanges** | |
 | List exchanges | `nfn exchanges list --format json` |
 | Filter by country | `nfn exchanges list --country SE` |
@@ -316,8 +316,8 @@ Looking for news?
 │   └── then → nfn articles list --sources <id1,id2>
 ├── Want a kind of source (exchange feeds, wire services...)? → nfn articles list --source-type stock_exchange
 │   └── Fastest disclosure tier → nfn articles list --source-type stock_exchange
-├── Want a specific category? → nfn categories (to see options)
-│   └── then → nfn articles list --category "Economic Policy"
+├── Want a specific category? → nfn categories (to see IDs)
+│   └── then → nfn articles list --category <category-id>
 ├── Want stories (clustered articles)? → nfn stories list
 ├── Want upcoming events (earnings, dividends, AGMs)? → nfn calendar list --ticker VOLV-B
 ├── Only about listed companies? → nfn articles list --listed
@@ -404,7 +404,7 @@ nfn companies stories VOLV-B --limit 5 --format json
 
 # The company feed takes the same filters as the flat feeds, scoped to that company:
 # by category and date range...
-nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01 --format json
+nfn companies articles VOLV-B --category <category-id> --published-after 2026-01-01 --format json
 # ...or a full-text search of the company's own coverage, newest first, all pages
 nfn companies articles VOLV-B --q "battery" --sort latest --all --format json
 # Drop articles where the company is only a passing mention
@@ -496,11 +496,11 @@ nfn stories list --sources <source_id> --format json
 ### Filter articles by category and country
 
 ```bash
-# See available categories
+# See available categories and their IDs — --category takes the ID, not the name
 nfn categories
 
 # Get Swedish articles in a specific category
-nfn articles list --country SE --category "Mergers & Acquisitions" --limit 10
+nfn articles list --country SE --category <category-id> --limit 10
 ```
 
 ### Scripting with JSON output
