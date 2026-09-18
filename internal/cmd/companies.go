@@ -217,7 +217,7 @@ var companiesArticlesCmd = &cobra.Command{
 	Short: "List articles for a company",
 	Example: `  nfn companies articles VOLV-B --limit 5
   nfn companies articles VOLV-B --primary-only
-  nfn companies articles VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01
+  nfn companies articles VOLV-B --category <category-id> --published-after 2026-01-01
   nfn companies articles VOLV-B --q "battery" --sort latest --all`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -252,7 +252,7 @@ var companiesStoriesCmd = &cobra.Command{
 	Use:   "stories <identifier>",
 	Short: "List stories for a company",
 	Example: `  nfn companies stories VOLV-B --limit 5
-  nfn companies stories VOLV-B --category "Mergers & Acquisitions" --published-after 2026-01-01
+  nfn companies stories VOLV-B --category <category-id> --published-after 2026-01-01
   nfn companies stories VOLV-B --q "battery" --sort latest --all`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

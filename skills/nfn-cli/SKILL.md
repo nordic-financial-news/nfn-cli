@@ -300,7 +300,7 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 ```
 Looking for news?
 ├── Know the ticker or company ID? → nfn companies articles VOLV-B
-│   ├── Narrow that company's own feed? → nfn companies articles VOLV-B --category "M&A" --published-after 2026-01-01
+│   ├── Narrow that company's own feed? → nfn companies articles VOLV-B --category <category-id> --published-after 2026-01-01
 │   ├── Search within it? → nfn companies articles VOLV-B --q "battery" --sort latest
 │   └── Drop passing mentions? → nfn companies articles VOLV-B --primary-only
 ├── Know the company name but not identifier? → nfn companies list --q "Volvo"
