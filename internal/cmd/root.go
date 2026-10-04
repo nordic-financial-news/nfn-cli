@@ -47,6 +47,11 @@ called by scripts/agents. Override with --format table or --format json.`,
 		jsonMode = format == "json"
 
 		formatter := output.NewFormatter(format, noColor)
+		// A --fields selection governs what the render call may emit, so it is
+		// attached once here rather than threaded through every renderer.
+		if err := applyFieldSelection(cmd, formatter); err != nil {
+			return err
+		}
 		ctx := context.WithValue(cmd.Context(), formatterKey, formatter)
 
 		// Skip auth for annotated commands

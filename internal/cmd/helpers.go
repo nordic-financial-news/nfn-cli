@@ -81,10 +81,6 @@ func addPaginationFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("all", false, "Fetch all pages of results")
 }
 
-func addFieldsFlag(cmd *cobra.Command) {
-	cmd.Flags().String("fields", "", "Comma-separated list of fields to include")
-}
-
 // contentFilterFlags maps CLI flag names to their query-param names for the
 // content filters shared across the article and story feeds and the nested
 // company routes. A command participates simply by registering the flag; only

@@ -382,7 +382,11 @@ func buildCompanyParams(cmd *cobra.Command) url.Values {
 
 func renderCompanies(f *output.Formatter, companies []api.Company, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"companies": companies}
+		rows, err := narrowJSON(f.Fields(), companies)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"companies": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
@@ -424,7 +428,12 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 			rows[i] = append(rows[i], formatDistance(c.Distance))
 		}
 	}
+	colFields := [][]string{{"id"}, {"name"}, {"ticker"}, {"exchange"}, {"is_active"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -444,7 +453,7 @@ func init() {
 	companiesListCmd.Flags().Bool("is-active", false, "Only show active companies")
 	companiesListCmd.Flags().Bool("watchlist", false, "Only show watchlisted companies")
 	addPaginationFlags(companiesListCmd)
-	addFieldsFlag(companiesListCmd)
+	addFieldsFlagFor(companiesListCmd, "company")
 	addSemanticFlag(companiesListCmd)
 
 	addPaginationFlags(companiesArticlesCmd)
@@ -452,15 +461,15 @@ func init() {
 	addCompanyNewsFilterFlags(companiesArticlesCmd)
 	companiesArticlesCmd.Flags().String("source-type", "", "Filter by source type (comma-separated: news_publication, wire_service, press_release, government, trade_publication, blog, stock_exchange, research)")
 	companiesArticlesCmd.Flags().String("content-type", "", "Filter by content type")
-	addFieldsFlag(companiesArticlesCmd)
+	addFieldsFlagFor(companiesArticlesCmd, "article")
 
 	addPaginationFlags(companiesStoriesCmd)
 	addCompanyNewsFilterFlags(companiesStoriesCmd)
-	addFieldsFlag(companiesStoriesCmd)
+	addFieldsFlagFor(companiesStoriesCmd, "story")
 
 	addEventFilterFlags(companiesEventsCmd)
 	addPaginationFlags(companiesEventsCmd)
-	addFieldsFlag(companiesEventsCmd)
+	addFieldsFlagFor(companiesEventsCmd, "event")
 
 	companiesCmd.AddCommand(companiesListCmd)
 	companiesCmd.AddCommand(companiesGetCmd)

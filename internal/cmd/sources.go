@@ -68,13 +68,18 @@ func renderSources(f *output.Formatter, sources []api.Source, pagination *api.Pa
 	for i, s := range sources {
 		rows[i] = []string{s.ID, s.Name, s.Domain, s.Country, s.SourceType}
 	}
+	colFields := [][]string{{"id"}, {"name"}, {"domain"}, {"country"}, {"source_type"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	return nil
 }
 
 func init() {
 	addPaginationFlags(sourcesListCmd)
-	addFieldsFlag(sourcesListCmd)
+	addFieldsFlagFor(sourcesListCmd, "source")
 
 	sourcesCmd.AddCommand(sourcesListCmd)
 	rootCmd.AddCommand(sourcesCmd)

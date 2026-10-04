@@ -317,7 +317,11 @@ func buildEventParams(cmd *cobra.Command) url.Values {
 
 func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagination, planLimited, truncated *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"events": events}
+		rows, err := narrowJSON(f.Fields(), events)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"events": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
@@ -372,7 +376,12 @@ func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagin
 			rows[i] = append(rows[i], formatDistance(e.Distance))
 		}
 	}
+	colFields := [][]string{{"id"}, {"first_reported_at"}, {"event_type"}, {"significance"}, {"title"}, {"article_count"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -384,7 +393,11 @@ func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagin
 
 func renderEventTypes(f *output.Formatter, eventTypes []api.EventTypeDetail, pagination *api.Pagination) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"event_types": eventTypes}
+		rows, err := narrowJSON(f.Fields(), eventTypes)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"event_types": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
@@ -396,7 +409,12 @@ func renderEventTypes(f *output.Formatter, eventTypes []api.EventTypeDetail, pag
 	for i, t := range eventTypes {
 		rows[i] = []string{t.Slug, t.Label, t.Category, truncate(t.Summary, 36)}
 	}
+	colFields := [][]string{{"slug"}, {"label"}, {"category"}, {"summary"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	return nil
 }
 
@@ -536,7 +554,7 @@ func init() {
 	eventsListCmd.Flags().Bool("listed", false, "Only events involving at least one company with an active listing; --include-peripheral does not widen this")
 	eventsListCmd.Flags().String("watchlist-id", "", "Only show events for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(eventsListCmd)
-	addFieldsFlag(eventsListCmd)
+	addFieldsFlagFor(eventsListCmd, "event")
 	addSemanticFlag(eventsListCmd)
 	// --q is registered by the shared helper, but only this route offers
 	// --semantic, so only this route's help may point at it.
@@ -544,7 +562,7 @@ func init() {
 
 	eventsGetCmd.Flags().Bool("include-peripheral", false, "Also list companies with a peripheral role (advisor, speaker, passing mention)")
 
-	eventTypesCmd.Flags().String("fields", "", "Comma-separated list of fields to include (id, slug, label, category, summary)")
+	addFieldsFlagFor(eventTypesCmd, "event_type")
 
 	eventsCmd.AddCommand(eventsListCmd)
 	eventsCmd.AddCommand(eventsGetCmd)

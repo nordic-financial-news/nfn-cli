@@ -12,6 +12,7 @@ type Formatter struct {
 	format  string
 	writer  io.Writer
 	noColor bool
+	fields  map[string]bool
 }
 
 // NewFormatter creates a new Formatter that writes to stdout.
@@ -35,6 +36,18 @@ func NewFormatterWithWriter(format string, noColor bool, w io.Writer) *Formatter
 // Format returns the current output format.
 func (f *Formatter) Format() string {
 	return f.format
+}
+
+// SetFields records the field selection a caller asked for, so a render call can
+// emit only what was requested instead of padding the rest with zero values. A
+// nil map means no selection was made and everything is rendered.
+func (f *Formatter) SetFields(fields map[string]bool) {
+	f.fields = fields
+}
+
+// Fields returns the recorded field selection, or nil when none was made.
+func (f *Formatter) Fields() map[string]bool {
+	return f.fields
 }
 
 // Render outputs columnar data as a table or JSON.

@@ -57,7 +57,8 @@ func runCommandWithArgs(t *testing.T, cmd *cobra.Command, handler http.HandlerFu
 	t.Cleanup(srv.Close)
 
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), formatterKey, output.NewFormatterWithWriter(format, true, &buf))
+	formatter := output.NewFormatterWithWriter(format, true, &buf)
+	ctx := context.WithValue(context.Background(), formatterKey, formatter)
 	ctx = context.WithValue(ctx, clientKey, api.NewClient("key", api.WithBaseURL(srv.URL)))
 
 	restoreFlags(t, cmd)
@@ -66,6 +67,11 @@ func runCommandWithArgs(t *testing.T, cmd *cobra.Command, handler http.HandlerFu
 	c.SetContext(ctx)
 	if err := c.ParseFlags(args); err != nil {
 		t.Fatalf("parsing flags: %v", err)
+	}
+	// The root command's PersistentPreRunE does this in production. Mirroring it
+	// here is what lets these tests cover a --fields selection end to end.
+	if err := applyFieldSelection(&c, formatter); err != nil {
+		t.Fatalf("applying --fields: %v", err)
 	}
 	if err := c.RunE(&c, cmdArgs); err != nil {
 		t.Fatalf("command failed: %v", err)

@@ -118,7 +118,7 @@ Query Nordic financial news articles, stories, events, companies, stock exchange
 
 12. **Article title, summary, and key points are machine-translated and AI-paraphrased** — the `title`, `summary`, and `key_points` fields are machine-translated from the source language and AI-paraphrased. They are not verbatim quotations and are not human-verified. When accuracy matters, follow `article_url` to the original source and attribute accordingly.
 
-13. **Calendar rows carry the issuer inline** — each calendar event has `company_id` plus, by default, an inline `company` object (`id`, `name`, `ticker`), so you don't need a separate `nfn companies get` per row to render the issuer. The table's Company column shows the name (falling back to the id if the issuer is withheld); read `data.calendar_events[].company` in JSON for the full object. `ticker` is `null` for an unlisted issuer. Note that `--fields` *narrows* the response to `id` plus the fields you name, so `--fields company` returns only the issuer and drops title/date/etc. — don't use it just to get the name, which is already there.
+13. **Calendar rows carry the issuer inline** — each calendar event has `company_id` plus, by default, an inline `company` object (`id`, `name`, `ticker`), so you don't need a separate `nfn companies get` per row to render the issuer. The table's Company column shows the name (falling back to the id if the issuer is withheld); read `data.calendar_events[].company` in JSON for the full object. `ticker` is `null` for an unlisted issuer. Note that `--fields` *narrows* the result to `id` plus the fields you name, in the table as well as the JSON, so `--fields company` returns only the issuer and drops title/date/etc. Don't use it just to get the name, which is already there.
 
 14. **Calendar date windows are issuer-local when you pass a bare date** — on `nfn calendar list`, `--scheduled-after` / `--scheduled-before` read a bare date (`2026-10-01`) as that calendar date in the *issuer's own* timezone, inclusive at both ends, so `--scheduled-after 2026-10-01 --scheduled-before 2026-10-31` returns October for every issuer regardless of where they sit relative to UTC. Day-precision events (earnings dates, AGMs, dividends given only as a date) are stored at the issuer's local midnight, so this is what you want in almost every case — do not widen the window by a day and filter on `local_time` yourself. Pass a full ISO 8601 datetime (`2026-11-01T00:00:00Z`, or with a UTC offset like `+02:00`) only when you genuinely mean an exact instant: `--scheduled-after` is then at-or-after and `--scheduled-before` is *strictly before* that instant. A datetime is **not** a shortcut to an exclusive calendar end — `--scheduled-before 2026-07-01T00:00:00Z` still picks up a 1 July event for an issuer ahead of UTC, because its local midnight (`2026-06-30T22:00:00Z` in Sweden) falls before the UTC one. For a window that means calendar days, use the bare-date form.
 
@@ -191,8 +191,18 @@ This is independent of pagination: `plan_limited` can be `true` even when `next_
 ### Filtering Fields
 
 ```bash
-nfn articles list --fields "id,title,published_at"  # Return only specified fields (JSON mode)
+nfn articles list --fields "id,title,published_at"  # Narrows both the JSON keys and the table columns
 ```
+
+`--fields` takes **API field names, not the table's column headings**: `first_reported_at`,
+not `reported`. An unknown name is rejected locally, and the error lists the names that feed
+accepts, so `--fields reported` costs no request. `nfn <command> --help` lists them too.
+
+A narrowed result omits what you did not ask for rather than reporting it empty: the JSON has
+no key for it, and the table has no column. So a field missing from the payload means "not
+requested", while `"country": ""` means the API really has no country. Asking for a field the
+table cannot show (`article_url`, `summary`) prints a note naming it and pointing at
+`--format json`. `id` comes back whether or not you ask for it.
 
 ## Quick Reference
 

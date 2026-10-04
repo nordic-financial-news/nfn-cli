@@ -154,7 +154,12 @@ func renderExchanges(f *output.Formatter, exchanges []api.ExchangeDetail, pagina
 		}
 		rows[i] = []string{e.ID, e.Name, e.MicCode, country}
 	}
+	colFields := [][]string{{"id"}, {"name"}, {"mic_code"}, {"country"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	return nil
 }
 
@@ -162,7 +167,7 @@ func init() {
 	exchangesListCmd.Flags().String("country", "", "Filter by country code (comma-separated ISO2, e.g. SE,NO)")
 	exchangesListCmd.Flags().Int("limit", 0, "Maximum number of results per page")
 	exchangesListCmd.Flags().String("cursor", "", "Pagination cursor")
-	addFieldsFlag(exchangesListCmd)
+	addFieldsFlagFor(exchangesListCmd, "exchange")
 
 	addPaginationFlags(exchangesCompaniesCmd)
 

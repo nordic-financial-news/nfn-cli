@@ -173,7 +173,11 @@ func buildCalendarParams(cmd *cobra.Command) url.Values {
 
 func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"calendar_events": events}
+		rows, err := narrowJSON(f.Fields(), events)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"calendar_events": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
@@ -191,7 +195,12 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 	for i, e := range events {
 		rows[i] = []string{e.ID, eventDate(e), e.EventType, truncate(e.Title, 60), eventCompany(e), e.Status}
 	}
+	colFields := [][]string{{"id"}, {"local_time", "scheduled_at"}, {"event_type"}, {"title"}, {"company", "company_id"}, {"status"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -238,7 +247,7 @@ func init() {
 	calendarListCmd.Flags().String("updated-after", "", "ISO 8601 datetime for incremental sync")
 	calendarListCmd.Flags().String("watchlist-id", "", "Only show events for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(calendarListCmd)
-	addFieldsFlag(calendarListCmd)
+	addFieldsFlagFor(calendarListCmd, "calendar_event")
 
 	calendarCmd.AddCommand(calendarListCmd)
 	calendarCmd.AddCommand(calendarGetCmd)

@@ -157,14 +157,19 @@ func renderIndices(f *output.Formatter, indices []api.StockIndex, pagination *ap
 		}
 		rows[i] = []string{idx.ID, idx.Name, idx.Symbol, exchange, panNordic}
 	}
+	colFields := [][]string{{"id"}, {"name"}, {"symbol"}, {"exchange"}, {"pan_nordic"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	return nil
 }
 
 func init() {
 	indicesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE); matches active exchanges only")
 	addPaginationFlags(indicesListCmd)
-	addFieldsFlag(indicesListCmd)
+	addFieldsFlagFor(indicesListCmd, "index")
 
 	addPaginationFlags(indicesCompaniesCmd)
 

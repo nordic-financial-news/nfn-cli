@@ -190,7 +190,11 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 
 func renderArticles(f *output.Formatter, articles []api.Article, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"articles": articles}
+		rows, err := narrowJSON(f.Fields(), articles)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"articles": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
@@ -228,7 +232,12 @@ func renderArticles(f *output.Formatter, articles []api.Article, pagination *api
 			rows[i] = append(rows[i], formatDistance(a.Distance))
 		}
 	}
+	colFields := [][]string{{"id"}, {"title"}, {"country"}, {"source"}, {"published_at"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -266,7 +275,7 @@ func init() {
 	articlesListCmd.Flags().String("watchlist-id", "", "Only show articles for companies in this watchlist (see 'nfn watchlists list')")
 	articlesListCmd.Flags().Bool("primary-only", false, "Only articles where the matched company is the primary subject, not a passing mention (requires --ticker, --company, or --watchlist-id)")
 	addPaginationFlags(articlesListCmd)
-	addFieldsFlag(articlesListCmd)
+	addFieldsFlagFor(articlesListCmd, "article")
 	addSemanticFlag(articlesListCmd)
 
 	articlesCmd.AddCommand(articlesListCmd)

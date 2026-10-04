@@ -157,7 +157,11 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 
 func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"stories": stories}
+		rows, err := narrowJSON(f.Fields(), stories)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"stories": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
@@ -191,7 +195,12 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 			rows[i] = append(rows[i], formatDistance(s.Distance))
 		}
 	}
+	colFields := [][]string{{"id"}, {"title"}, {"country"}, {"article_count"}, {"published_at"}}
+	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
 	f.Render(columns, rows)
+	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
+		f.Println(note)
+	}
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -216,7 +225,7 @@ func init() {
 	storiesListCmd.Flags().Bool("listed", false, "Only show stories about listed companies")
 	storiesListCmd.Flags().String("watchlist-id", "", "Only show stories for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(storiesListCmd)
-	addFieldsFlag(storiesListCmd)
+	addFieldsFlagFor(storiesListCmd, "story")
 	addSemanticFlag(storiesListCmd)
 
 	storiesCmd.AddCommand(storiesListCmd)
