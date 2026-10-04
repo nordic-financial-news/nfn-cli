@@ -186,7 +186,7 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 		if len(cmdPath) > 0 {
 			path = cmdPath[0]
 		}
-		summary := planLimitedSummary(fmt.Sprintf("%d calendar events", len(events)), planLimited)
+		summary := planLimitedSummary(countNoun(len(events), calendarNoun), planLimited)
 		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
 	}
 
@@ -201,7 +201,7 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
-	listFooter{noun: [2]string{"calendar event", "calendar events"}, getCmd: "nfn calendar get", pagination: pagination}.print(f, len(events))
+	listFooter{noun: calendarNoun, getCmd: "nfn calendar get", pagination: pagination}.print(f, len(events))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -254,3 +254,5 @@ func init() {
 	calendarCmd.AddCommand(calendarGetCmd)
 	rootCmd.AddCommand(calendarCmd)
 }
+
+var calendarNoun = [2]string{"calendar event", "calendar events"}

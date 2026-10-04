@@ -101,7 +101,7 @@ outside your plan's reach returns 403 rather than 404.`,
 
 		event, _, err := client.GetEvent(cmd.Context(), args[0], params)
 		if err != nil {
-			return err
+			return notFoundError(err, fmt.Sprintf("no event has ID %q. Find one with 'nfn events list'", args[0]))
 		}
 
 		if f.Format() == "json" {
@@ -340,7 +340,7 @@ func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagin
 		if len(cmdPath) > 0 {
 			path = cmdPath[0]
 		}
-		summary := planLimitedSummary(fmt.Sprintf("%d events", len(events)), planLimited)
+		summary := planLimitedSummary(countNoun(len(events), eventNoun), planLimited)
 		if truncated != nil {
 			result["truncated"] = *truncated
 			if *truncated {
@@ -431,7 +431,7 @@ func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagin
 		f.Println(note)
 	}
 	footer := listFooter{
-		noun:       [2]string{"event", "events"},
+		noun:       eventNoun,
 		getCmd:     "nfn events get",
 		pagination: pagination,
 		emptyHint:  "Try a wider --window, or fewer filters.",
@@ -536,32 +536,19 @@ func eventArticleCount(e api.Event) string {
 // eventNextSteps are the follow-up commands printed under an event's detail
 // table: the hops its IDs lead to, which JSON output carries as breadcrumbs.
 func eventNextSteps(e *api.Event) []string {
-	var labels, commands []string
+	var steps []nextStep
 	switch {
 	case e.PrimaryDisclosureArticleID != "":
-		labels = append(labels, "Read the disclosure:")
-		commands = append(commands, "nfn articles get "+e.PrimaryDisclosureArticleID)
+		steps = append(steps, nextStep{"Read the disclosure:", "nfn articles get " + e.PrimaryDisclosureArticleID})
 	case len(e.ArticleIDs) > 0:
-		labels = append(labels, "Read an article:")
-		commands = append(commands, "nfn articles get "+e.ArticleIDs[0])
+		steps = append(steps, nextStep{"Read an article:", "nfn articles get " + e.ArticleIDs[0]})
 	}
 	if e.RelatedTo != "" {
-		labels = append(labels, "The event it covers:")
-		commands = append(commands, "nfn events get "+e.RelatedTo)
+		steps = append(steps, nextStep{"The event it covers:", "nfn events get " + e.RelatedTo})
 	} else if e.Significance != "commentary" {
-		labels = append(labels, "Commentary on it:")
-		commands = append(commands, "nfn events list --related-to "+e.ID)
+		steps = append(steps, nextStep{"Commentary on it:", "nfn events list --related-to " + e.ID})
 	}
-
-	width := 0
-	for _, l := range labels {
-		width = max(width, len(l))
-	}
-	steps := make([]string, len(labels))
-	for i := range labels {
-		steps[i] = fmt.Sprintf("%-*s %s", width, labels[i], commands[i])
-	}
-	return steps
+	return formatNextSteps(steps)
 }
 
 // eventSummaryLine is the envelope summary for a single event, naming the
@@ -703,3 +690,5 @@ func addEventFilterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("related-to", "", "Filter to commentary events reacting to this event ID; an unresolvable ID returns no results rather than an error")
 	cmd.Flags().Bool("include-peripheral", false, "Widen --ticker, --company, --watchlist-id and the returned company IDs to peripheral roles (advisor, speaker, passing mention)")
 }
+
+var eventNoun = [2]string{"event", "events"}

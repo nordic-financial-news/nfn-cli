@@ -59,14 +59,14 @@ are not human-verified.`,
 			if err != nil {
 				return watchlistFilterError(err, watchlistID)
 			}
-			return renderArticles(f, articles, nil, planLimitedFrom(resp))
+			return renderArticles(f, articles, nil, planLimitedFrom(resp), listOpts{order: orderNote(cmd, true)})
 		}
 
 		articles, pagination, resp, err := client.ListArticles(cmd.Context(), params)
 		if err != nil {
 			return semanticError(watchlistFilterError(err, watchlistID), semantic)
 		}
-		return renderArticles(f, articles, pagination, planLimitedFrom(resp))
+		return renderArticles(f, articles, pagination, planLimitedFrom(resp), listOpts{order: orderNote(cmd, true)})
 	},
 }
 
@@ -87,60 +87,76 @@ human-verified. Use the article_url / URL field to reach the original source.`,
 
 		article, _, err := client.GetArticle(cmd.Context(), args[0])
 		if err != nil {
-			return err
+			return notFoundError(err, fmt.Sprintf("no article has ID %q. Find one with 'nfn articles list'", args[0]))
 		}
 
 		if f.Format() == "json" {
 			return f.RenderEnvelope(article, fmt.Sprintf("article: %s", article.Title), breadcrumbsFor("nfn articles get"))
 		}
 
-		category := ""
-		if article.Category != nil {
-			category = article.Category.Name
+		f.RenderDetail(articleFields(article))
+		for _, line := range articleNextSteps(article) {
+			f.Println(line)
 		}
-		source := ""
-		sourceType := ""
-		if article.Source != nil {
-			source = article.Source.Name
-			sourceType = article.Source.SourceType
-		}
-		companies := make([]string, len(article.Companies))
-		for i, c := range article.Companies {
-			if c.TickerSymbol != "" {
-				companies[i] = c.Name + " (" + c.TickerSymbol + ")"
-			} else {
-				companies[i] = c.Name
-			}
-		}
-
-		fields := []output.Field{
-			{Key: "ID", Value: article.ID},
-			{Key: "Title", Value: article.Title},
-			{Key: "Source Title", Value: article.SourceTitle},
-			{Key: "Summary", Value: article.Summary},
-			{Key: "URL", Value: article.ArticleURL},
-			{Key: "Type", Value: article.ContentType},
-			{Key: "Published", Value: article.PublishedAt},
-			{Key: "Country", Value: article.Country},
-			{Key: "Category", Value: category},
-			{Key: "Source", Value: source},
-		}
-
-		if sourceType != "" {
-			fields = append(fields, output.Field{Key: "Source Type", Value: sourceType})
-		}
-		fields = append(fields, output.Field{Key: "Companies", Value: strings.Join(companies, ", ")})
-
-		if len(article.KeyPoints) > 0 {
-			fields = append(fields, output.Field{Key: "Key Points", Value: strings.Join(article.KeyPoints, "\n")})
-		}
-		if article.EventID != "" {
-			fields = append(fields, output.Field{Key: "Event", Value: article.EventID})
-		}
-
-		f.RenderDetail(fields)
 		return nil
 	},
+}
+
+// articleFields runs from what the article says, to who it is about, to where
+// it came from. The URL is left to the lines under the table: wrapped inside a
+// cell it would break mid-token and no longer open.
+func articleFields(a *api.Article) []output.Field {
+	fields := []output.Field{
+		{Key: "ID", Value: a.ID},
+		{Key: "Title", Value: a.Title},
+		{Key: "Summary", Value: a.Summary},
+	}
+	if len(a.KeyPoints) > 0 {
+		points := make([]string, len(a.KeyPoints))
+		for i, p := range a.KeyPoints {
+			points[i] = output.Bullet + p
+		}
+		fields = append(fields, output.Field{Key: "Key Points", Value: strings.Join(points, "\n")})
+	}
+	if len(a.Companies) > 0 {
+		fields = append(fields, output.Field{Key: "Companies", Value: handleLines(a.Companies)})
+	}
+	fields = append(fields, output.Field{Key: "Published", Value: detailTime(a.PublishedAt)})
+	if a.Source != nil {
+		source := a.Source.Name
+		if a.Source.SourceType != "" {
+			source += " (" + humanize(a.Source.SourceType) + ")"
+		}
+		fields = append(fields, output.Field{Key: "Source", Value: source})
+	}
+	if a.ContentType != "" {
+		fields = append(fields, output.Field{Key: "Type", Value: humanize(a.ContentType)})
+	}
+	if a.Category != nil {
+		fields = append(fields, output.Field{Key: "Category", Value: a.Category.Name})
+	}
+	if a.Country != "" {
+		fields = append(fields, output.Field{Key: "Country", Value: a.Country})
+	}
+	// The headline as published, before translation.
+	if a.SourceTitle != "" && a.SourceTitle != a.Title {
+		fields = append(fields, output.Field{Key: "Original Title", Value: a.SourceTitle})
+	}
+	if a.EventID != "" {
+		fields = append(fields, output.Field{Key: "Event", Value: a.EventID})
+	}
+	return fields
+}
+
+func articleNextSteps(a *api.Article) []string {
+	var steps []nextStep
+	if a.ArticleURL != "" {
+		steps = append(steps, nextStep{"Read the original:", a.ArticleURL})
+	}
+	if a.EventID != "" {
+		steps = append(steps, nextStep{"The event it reports:", "nfn events get " + a.EventID})
+	}
+	return formatNextSteps(steps)
 }
 
 func buildArticleParams(cmd *cobra.Command) url.Values {
@@ -188,7 +204,7 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	return params
 }
 
-func renderArticles(f *output.Formatter, articles []api.Article, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
+func renderArticles(f *output.Formatter, articles []api.Article, pagination *api.Pagination, planLimited *bool, opts listOpts) error {
 	if f.Format() == "json" {
 		rows, err := narrowJSON(f.Fields(), articles)
 		if err != nil {
@@ -199,12 +215,8 @@ func renderArticles(f *output.Formatter, articles []api.Article, pagination *api
 			result["pagination"] = paginationJSON(pagination)
 		}
 		addPlanLimited(result, planLimited)
-		path := "nfn articles list"
-		if len(cmdPath) > 0 {
-			path = cmdPath[0]
-		}
-		summary := planLimitedSummary(fmt.Sprintf("%d articles", len(articles)), planLimited)
-		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
+		summary := planLimitedSummary(countNoun(len(articles), articleNoun), planLimited)
+		return f.RenderEnvelope(result, summary, breadcrumbsFor(opts.pathOr("nfn articles list")))
 	}
 
 	// Only a semantic search returns distances, so the column appears only when
@@ -238,7 +250,7 @@ func renderArticles(f *output.Formatter, articles []api.Article, pagination *api
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
-	listFooter{noun: [2]string{"article", "articles"}, getCmd: "nfn articles get", pagination: pagination}.print(f, len(articles))
+	listFooter{noun: articleNoun, getCmd: "nfn articles get", pagination: pagination, notes: opts.notes()}.print(f, len(articles))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -275,3 +287,5 @@ func init() {
 	articlesCmd.AddCommand(articlesGetCmd)
 	rootCmd.AddCommand(articlesCmd)
 }
+
+var articleNoun = [2]string{"article", "articles"}

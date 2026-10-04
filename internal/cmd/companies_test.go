@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/nordic-financial-news/nfn-cli/internal/api"
 )
 
 func TestBuildCompanyParams(t *testing.T) {
@@ -245,5 +249,139 @@ func TestBuildCompanyParamsIsActive(t *testing.T) {
 				t.Errorf("is_active = %q, want %q", got[0], tt.want)
 			}
 		})
+	}
+}
+
+func TestCompaniesList_Table(t *testing.T) {
+	active := `{"companies":[` +
+		`{"id":"co1","name":"AB Volvo","ticker":"VOLV-B","is_active":true,"exchange":{"mic_code":"XSTO"}},` +
+		`{"id":"co2","name":"Volvo Penta","ticker":"","is_active":true}],` +
+		`"pagination":{"count":2,"next_cursor":"cur9"}}`
+
+	t.Run("listing column, footer and next cursor", func(t *testing.T) {
+		out := runListCommand(t, companiesListCmd, fixedBody(active), "table", "--q", "Volvo")
+		for _, want := range []string{"VOLV-B · XSTO", "unlisted", "2 companies. Details: nfn companies get <id>", "--cursor cur9"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "STATUS") {
+			t.Errorf("output has a Status column on an all-active page\n%s", out)
+		}
+	})
+
+	t.Run("an inactive company brings in the Status column", func(t *testing.T) {
+		body := `{"companies":[{"id":"co3","name":"Anttila","is_active":false}],"pagination":{"count":1}}`
+		out := runListCommand(t, companiesListCmd, fixedBody(body), "table", "--q", "Anttila")
+		if !strings.Contains(out, "STATUS") || !strings.Contains(out, "inactive") {
+			t.Errorf("output = %q, want the company marked inactive", out)
+		}
+	})
+
+	// --fields cannot request is_active, so a narrowed row reads as inactive;
+	// the Status column must not take that at face value.
+	t.Run("a --fields selection does not mark every row inactive", func(t *testing.T) {
+		body := `{"companies":[{"id":"co1","name":"AB Volvo","ticker":"VOLV-B"}],"pagination":{"count":1}}`
+		out := runListCommand(t, companiesListCmd, fixedBody(body), "table", "--q", "Volvo", "--fields", "name,ticker")
+		if strings.Contains(out, "inactive") {
+			t.Errorf("output = %q, want no Status column under --fields", out)
+		}
+	})
+
+	t.Run("an unfiltered list says it is alphabetical", func(t *testing.T) {
+		out := runListCommand(t, companiesListCmd, fixedBody(active), "table")
+		if !strings.Contains(out, "alphabetical; narrow with --q") {
+			t.Errorf("output = %q, want the ordering named", out)
+		}
+	})
+
+	t.Run("no matches says so instead of drawing a header", func(t *testing.T) {
+		out := runListCommand(t, companiesListCmd, fixedBody(`{"companies":[],"pagination":{"count":0}}`), "table", "--q", "zzz")
+		if strings.Contains(out, "NAME") || !strings.Contains(out, "No companies match.") {
+			t.Errorf("output = %q, want only the empty-state line", out)
+		}
+	})
+}
+
+func TestUnfilteredCompanyList(t *testing.T) {
+	t.Parallel()
+	if !unfilteredCompanyList(url.Values{"limit": {"5"}, "cursor": {"abc"}}) {
+		t.Error("paging params alone should count as unfiltered")
+	}
+	if unfilteredCompanyList(url.Values{"listed": {"true"}}) {
+		t.Error("--listed should count as a filter")
+	}
+}
+
+func TestCompaniesGet_Detail(t *testing.T) {
+	body := `{"company":{"id":"co1","name":"AB Volvo","slug":"ab-volvo","ticker":"VOLV-B","is_active":true,` +
+		`"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"},` +
+		`"stock_listings":[{"ticker":"VOLV-B","primary":true,"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"}},` +
+		`{"ticker":"VOLV-A","primary":false,"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"}}],` +
+		`"also_listed_on":[{"ticker":"VOLV-A","mic_code":"XSTO"}],` +
+		`"subsidiaries":[{"id":"sub1","name":"Volvo Penta"},{"id":"sub2","name":"Volvo Cars","ticker":"VOLCAR-B"}],` +
+		`"article_count":637,"story_count":24}}`
+
+	out := runCommandWithArgs(t, companiesGetCmd, fixedBody(body), "table", []string{"VOLV-B"})
+
+	if strings.Contains(out, "ab-volvo") {
+		t.Errorf("output = %q, want the slug left to JSON", out)
+	}
+	if n := strings.Count(out, "VOLV-A"); n != 1 {
+		t.Errorf("VOLV-A appears %d times, want the two listing fields merged into one\n%s", n, out)
+	}
+	for _, want := range []string{
+		"VOLV-B · Nasdaq Stockholm (XSTO) · primary",
+		"sub1      Volvo Penta", "VOLCAR-B  Volvo Cars",
+		"nfn companies events VOLV-B",
+		"637 articles:", "nfn companies articles VOLV-B",
+		"nfn calendar list --ticker VOLV-B",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestCompanyListings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		company api.Company
+		want    []string
+	}{
+		{name: "unlisted", company: api.Company{ID: "co1"}, want: []string{"Not listed"}},
+		{
+			name:    "a single listing is not marked primary",
+			company: api.Company{StockListings: []api.StockListing{{TickerSymbol: "SAAB-B", Primary: true, Exchange: api.Exchange{MicCode: "XSTO"}}}},
+			want:    []string{"SAAB-B · XSTO"},
+		},
+		{
+			name:    "summary fields when the detail listings are absent",
+			company: api.Company{TickerSymbol: "VOLV-B", Exchange: &api.Exchange{MicCode: "XSTO"}, AlsoListedOn: []api.OtherListing{{TickerSymbol: "VOLV-A", MicCode: "XSTO"}}},
+			want:    []string{"VOLV-B · XSTO", "VOLV-A · XSTO"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := companyListings(&tt.company); strings.Join(got, "|") != strings.Join(tt.want, "|") {
+				t.Errorf("companyListings() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// An unlisted company has no ticker, so its next steps fall back to the ID and
+// leave out the calendar, which is keyed by listing.
+func TestCompanyNextStepsForAnUnlistedCompany(t *testing.T) {
+	t.Parallel()
+	got := strings.Join(companyNextSteps(&api.Company{ID: "co2", ArticleCount: 1}), "\n")
+	if !strings.Contains(got, "nfn companies events co2") || !strings.Contains(got, "1 article:") {
+		t.Errorf("steps = %q, want events and articles by ID", got)
+	}
+	if strings.Contains(got, "calendar") || strings.Contains(got, "stories") {
+		t.Errorf("steps = %q, want no calendar or empty stories step", got)
 	}
 }

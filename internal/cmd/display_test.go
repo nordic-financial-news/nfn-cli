@@ -9,6 +9,7 @@ import (
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
 	"github.com/nordic-financial-news/nfn-cli/internal/output"
+	"github.com/spf13/cobra"
 )
 
 func TestFormatListTime(t *testing.T) {
@@ -137,5 +138,59 @@ func TestEventTypeError(t *testing.T) {
 	other := errors.New("network down")
 	if got := eventTypeError(other); got != other {
 		t.Errorf("an unrelated error was rewritten to %q", got)
+	}
+}
+
+func TestFormatNextSteps(t *testing.T) {
+	t.Parallel()
+	got := formatNextSteps([]nextStep{{"Events:", "nfn companies events VOLV-B"}, {"637 articles:", "nfn companies articles VOLV-B"}})
+	want := []string{"Events:       nfn companies events VOLV-B", "637 articles: nfn companies articles VOLV-B"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("formatNextSteps() = %q, want %q", got, want)
+	}
+}
+
+// Every line must start with something 'nfn companies get' accepts, so a
+// company without a ticker is shown by its ID.
+func TestHandleLines(t *testing.T) {
+	t.Parallel()
+	got := handleLines([]api.Company{{ID: "uejazctgchj4", Name: "AB Volvo", TickerSymbol: "VOLV-B"}, {ID: "hp14n1ibr1dz", Name: "Volvo Penta"}})
+	want := "VOLV-B        AB Volvo\nhp14n1ibr1dz  Volvo Penta"
+	if got != want {
+		t.Errorf("handleLines() = %q, want %q", got, want)
+	}
+}
+
+func TestOrderNote(t *testing.T) {
+	newCmd := func() *cobra.Command {
+		c := &cobra.Command{}
+		c.Flags().String("q", "", "")
+		c.Flags().String("sort", "", "")
+		c.Flags().Bool("semantic", false, "")
+		return c
+	}
+	tests := []struct {
+		name      string
+		flags     map[string]string
+		relevance bool
+		want      string
+	}{
+		{name: "a feed is newest first and says nothing", relevance: true, want: ""},
+		{name: "--q alone ranks by relevance", flags: map[string]string{"q": "battery"}, relevance: true, want: "ranked by relevance; add --sort latest for newest first"},
+		{name: "--sort latest restores date order", flags: map[string]string{"q": "battery", "sort": "latest"}, relevance: true, want: ""},
+		{name: "--semantic ranks by meaning", flags: map[string]string{"q": "battery", "semantic": "true"}, want: "ranked by meaning"},
+		{name: "a command whose --q is not relevance-ranked", flags: map[string]string{"q": "Volvo"}, want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			c := newCmd()
+			for k, v := range tt.flags {
+				_ = c.Flags().Set(k, v)
+			}
+			if got := orderNote(c, tt.relevance); got != tt.want {
+				t.Errorf("orderNote() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

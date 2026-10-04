@@ -40,6 +40,10 @@ var companiesListCmd = &cobra.Command{
 
 		params := buildCompanyParams(cmd)
 		semantic := semanticRequested(cmd)
+		opts := listOpts{order: orderNote(cmd, false)}
+		if unfilteredCompanyList(params) {
+			opts.order = "alphabetical; narrow with --q, --listed or --market"
+		}
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
@@ -47,14 +51,14 @@ var companiesListCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return renderCompanies(f, companies, nil, planLimitedFrom(resp))
+			return renderCompanies(f, companies, nil, planLimitedFrom(resp), opts)
 		}
 
 		companies, pagination, resp, err := client.ListCompanies(cmd.Context(), params)
 		if err != nil {
 			return semanticError(err, semantic)
 		}
-		return renderCompanies(f, companies, pagination, planLimitedFrom(resp))
+		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), opts)
 	},
 }
 
@@ -78,53 +82,36 @@ var companiesGetCmd = &cobra.Command{
 			return f.RenderEnvelope(company, fmt.Sprintf("company: %s", company.Name), breadcrumbsFor("nfn companies get"))
 		}
 
-		exchange := ""
-		if company.Exchange != nil {
-			exchange = fmt.Sprintf("%s (%s)", company.Exchange.Name, company.Exchange.MicCode)
+		// Rows run from which company this is and where it trades, to what it
+		// does and how it is related, to the registry record. The slug is left
+		// to JSON: it is a URL key, not something a reader looks a company up by.
+		listings := companyListings(company)
+		listingKey := "Listing"
+		if len(listings) > 1 {
+			listingKey = "Listings"
 		}
-
-		active := "No"
-		if company.IsActive {
-			active = "Yes"
-		}
-
 		fields := []output.Field{
 			{Key: "ID", Value: company.ID},
 			{Key: "Name", Value: company.Name},
-			{Key: "Ticker", Value: company.TickerSymbol},
-			{Key: "Exchange", Value: exchange},
-			{Key: "Slug", Value: company.Slug},
-			{Key: "Active", Value: active},
+			{Key: listingKey, Value: strings.Join(listings, "\n")},
+		}
+		if len(company.FormerTickers) > 0 {
+			fields = append(fields, output.Field{Key: "Former Tickers", Value: strings.Join(company.FormerTickers, ", ")})
+		}
+		if !company.IsActive {
+			fields = append(fields, output.Field{Key: "Status", Value: "Inactive"})
 		}
 		if company.Country != nil {
 			fields = append(fields, output.Field{Key: "Country", Value: fmt.Sprintf("%s (%s)", company.Country.Name, company.Country.ISO2Code)})
 		}
-		if company.Description != "" {
-			fields = append(fields, output.Field{Key: "Description", Value: company.Description})
-		}
 		if company.Sector != "" {
 			fields = append(fields, output.Field{Key: "Sector", Value: company.Sector})
 		}
+		if company.Description != "" {
+			fields = append(fields, output.Field{Key: "Description", Value: company.Description})
+		}
 		if company.Website != "" {
 			fields = append(fields, output.Field{Key: "Website", Value: company.Website})
-		}
-		if company.ParentCompany != nil {
-			parent := company.ParentCompany.Name
-			if company.ParentCompany.TickerSymbol != "" {
-				parent += " (" + company.ParentCompany.TickerSymbol + ")"
-			}
-			fields = append(fields, output.Field{Key: "Parent Company", Value: parent})
-		}
-		if len(company.Subsidiaries) > 0 {
-			subs := make([]string, len(company.Subsidiaries))
-			for i, s := range company.Subsidiaries {
-				if s.TickerSymbol != "" {
-					subs[i] = s.Name + " (" + s.TickerSymbol + ")"
-				} else {
-					subs[i] = s.Name
-				}
-			}
-			fields = append(fields, output.Field{Key: "Subsidiaries", Value: strings.Join(subs, ", ")})
 		}
 		if len(company.Indices) > 0 {
 			indices := make([]string, len(company.Indices))
@@ -135,31 +122,15 @@ var companiesGetCmd = &cobra.Command{
 					indices[i] = idx.Name
 				}
 			}
-			fields = append(fields, output.Field{Key: "Indices", Value: strings.Join(indices, ", ")})
+			fields = append(fields, output.Field{Key: "Indices", Value: strings.Join(indices, "\n")})
 		}
-		if len(company.StockListings) > 0 {
-			listings := make([]string, len(company.StockListings))
-			for i, l := range company.StockListings {
-				primary := ""
-				if l.Primary {
-					primary = " [primary]"
-				}
-				listings[i] = fmt.Sprintf("%s @ %s%s", l.TickerSymbol, l.Exchange.MicCode, primary)
-			}
-			fields = append(fields, output.Field{Key: "Stock Listings", Value: strings.Join(listings, ", ")})
+		// Related companies lead with a handle 'nfn companies get' takes, since
+		// most subsidiaries have no ticker to look them up by.
+		if company.ParentCompany != nil {
+			fields = append(fields, output.Field{Key: "Parent Company", Value: handleLines([]api.Company{*company.ParentCompany})})
 		}
-		if len(company.AlsoListedOn) > 0 {
-			other := make([]string, len(company.AlsoListedOn))
-			for i, l := range company.AlsoListedOn {
-				other[i] = fmt.Sprintf("%s @ %s", l.TickerSymbol, l.MicCode)
-			}
-			fields = append(fields, output.Field{Key: "Also Listed On", Value: strings.Join(other, ", ")})
-		}
-		if company.ArticleCount > 0 {
-			fields = append(fields, output.Field{Key: "Articles", Value: fmt.Sprintf("%d", company.ArticleCount)})
-		}
-		if company.StoryCount > 0 {
-			fields = append(fields, output.Field{Key: "Stories", Value: fmt.Sprintf("%d", company.StoryCount)})
+		if len(company.Subsidiaries) > 0 {
+			fields = append(fields, output.Field{Key: "Subsidiaries", Value: handleLines(company.Subsidiaries)})
 		}
 		if r := company.Registry; r != nil {
 			if r.Source != "" {
@@ -208,8 +179,61 @@ var companiesGetCmd = &cobra.Command{
 		}
 
 		f.RenderDetail(fields)
+		for _, line := range companyNextSteps(company) {
+			f.Println(line)
+		}
 		return nil
 	},
+}
+
+// companyListings is one line per listing, naming the venue in full where the
+// payload carries it and marking the primary one when there is a choice.
+func companyListings(c *api.Company) []string {
+	if len(c.StockListings) > 0 {
+		lines := make([]string, len(c.StockListings))
+		for i, l := range c.StockListings {
+			lines[i] = l.TickerSymbol + " · " + exchangeLabel(&l.Exchange)
+			if l.Primary && len(c.StockListings) > 1 {
+				lines[i] += " · primary"
+			}
+		}
+		return lines
+	}
+	if c.TickerSymbol == "" {
+		return []string{"Not listed"}
+	}
+	lines := []string{c.TickerSymbol}
+	if c.Exchange != nil {
+		lines[0] += " · " + exchangeLabel(c.Exchange)
+	}
+	for _, l := range c.AlsoListedOn {
+		lines = append(lines, l.TickerSymbol+" · "+l.MicCode)
+	}
+	return lines
+}
+
+func exchangeLabel(e *api.Exchange) string {
+	if e.Name == "" {
+		return e.MicCode
+	}
+	return fmt.Sprintf("%s (%s)", e.Name, e.MicCode)
+}
+
+// companyNextSteps points at the feeds a company page is the way into, with
+// the counts the detail payload carries.
+func companyNextSteps(c *api.Company) []string {
+	handle := companyHandle(*c)
+	steps := []nextStep{{"Events:", "nfn companies events " + handle}}
+	if c.ArticleCount > 0 {
+		steps = append(steps, nextStep{countNoun(c.ArticleCount, articleNoun) + ":", "nfn companies articles " + handle})
+	}
+	if c.StoryCount > 0 {
+		steps = append(steps, nextStep{countNoun(c.StoryCount, storyNoun) + ":", "nfn companies stories " + handle})
+	}
+	if c.TickerSymbol != "" {
+		steps = append(steps, nextStep{"Scheduled dates:", "nfn calendar list --ticker " + c.TickerSymbol})
+	}
+	return formatNextSteps(steps)
 }
 
 var companiesArticlesCmd = &cobra.Command{
@@ -237,14 +261,14 @@ var companiesArticlesCmd = &cobra.Command{
 			if err != nil {
 				return companyNotFoundError(err, args[0])
 			}
-			return renderArticles(f, articles, nil, planLimitedFrom(resp), "nfn companies articles")
+			return renderArticles(f, articles, nil, planLimitedFrom(resp), listOpts{path: "nfn companies articles", order: orderNote(cmd, true)})
 		}
 
 		articles, pagination, resp, err := client.ListCompanyArticles(cmd.Context(), args[0], params)
 		if err != nil {
 			return companyNotFoundError(err, args[0])
 		}
-		return renderArticles(f, articles, pagination, planLimitedFrom(resp), "nfn companies articles")
+		return renderArticles(f, articles, pagination, planLimitedFrom(resp), listOpts{path: "nfn companies articles", order: orderNote(cmd, true)})
 	},
 }
 
@@ -269,14 +293,14 @@ var companiesStoriesCmd = &cobra.Command{
 			if err != nil {
 				return companyNotFoundError(err, args[0])
 			}
-			return renderStories(f, stories, nil, planLimitedFrom(resp), "nfn companies stories")
+			return renderStories(f, stories, nil, planLimitedFrom(resp), listOpts{path: "nfn companies stories", order: orderNote(cmd, true)})
 		}
 
 		stories, pagination, resp, err := client.ListCompanyStories(cmd.Context(), args[0], params)
 		if err != nil {
 			return companyNotFoundError(err, args[0])
 		}
-		return renderStories(f, stories, pagination, planLimitedFrom(resp), "nfn companies stories")
+		return renderStories(f, stories, pagination, planLimitedFrom(resp), listOpts{path: "nfn companies stories", order: orderNote(cmd, true)})
 	},
 }
 
@@ -321,6 +345,19 @@ company's events by meaning with --semantic.`,
 		}
 		return renderEvents(f, events, pagination, planLimitedFrom(resp), truncatedFrom(resp), "nfn companies events")
 	},
+}
+
+// unfilteredCompanyList reports a request for every company, which the API
+// answers alphabetically across listed and private companies alike.
+func unfilteredCompanyList(params url.Values) bool {
+	for key := range params {
+		switch key {
+		case "limit", "cursor", "fields":
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func buildCompanyParams(cmd *cobra.Command) url.Values {
@@ -380,7 +417,7 @@ func buildCompanyParams(cmd *cobra.Command) url.Values {
 	return params
 }
 
-func renderCompanies(f *output.Formatter, companies []api.Company, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
+func renderCompanies(f *output.Formatter, companies []api.Company, pagination *api.Pagination, planLimited *bool, opts listOpts) error {
 	if f.Format() == "json" {
 		rows, err := narrowJSON(f.Fields(), companies)
 		if err != nil {
@@ -391,53 +428,74 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 			result["pagination"] = paginationJSON(pagination)
 		}
 		addPlanLimited(result, planLimited)
-		path := "nfn companies list"
-		if len(cmdPath) > 0 {
-			path = cmdPath[0]
-		}
-		summary := planLimitedSummary(fmt.Sprintf("%d companies", len(companies)), planLimited)
-		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
+		summary := planLimitedSummary(countNoun(len(companies), companyNoun), planLimited)
+		return f.RenderEnvelope(result, summary, breadcrumbsFor(opts.pathOr("nfn companies list")))
 	}
 
-	// Only a semantic search returns distances, so the column appears only when
-	// the results actually carry them.
-	showDistance := false
+	// Inactive companies are rare, so a Status column on every page would be a
+	// column of blanks; it appears only when the page holds one. Only a semantic
+	// search returns distances, so that column likewise appears only with them.
+	showStatus, showDistance := false, false
 	for _, c := range companies {
-		if c.Distance != nil {
-			showDistance = true
-			break
-		}
+		showStatus = showStatus || !c.IsActive
+		showDistance = showDistance || c.Distance != nil
 	}
 
-	columns := []string{"ID", "Name", "Ticker", "Exchange", "Active"}
+	columns := []string{"ID", "Name", "Listing"}
+	colFields := [][]string{{"id"}, {"name"}, {"ticker"}}
+	if showStatus {
+		columns = append(columns, "Status")
+		colFields = append(colFields, []string{"is_active"})
+	}
 	if showDistance {
 		columns = append(columns, "Distance")
+		colFields = append(colFields, nil)
 	}
 	rows := make([][]string, len(companies))
 	for i, c := range companies {
-		exchange := ""
-		if c.Exchange != nil {
-			exchange = c.Exchange.MicCode
+		row := []string{c.ID, c.Name, companyListing(c)}
+		if showStatus {
+			status := ""
+			if !c.IsActive {
+				status = "inactive"
+			}
+			row = append(row, status)
 		}
-		active := "No"
-		if c.IsActive {
-			active = "Yes"
-		}
-		rows[i] = []string{c.ID, c.Name, c.TickerSymbol, exchange, active}
 		if showDistance {
-			rows[i] = append(rows[i], formatDistance(c.Distance))
+			row = append(row, formatDistance(c.Distance))
 		}
+		rows[i] = row
 	}
-	colFields := [][]string{{"id"}, {"name"}, {"ticker"}, {"exchange"}, {"is_active"}}
 	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
-	f.Render(columns, rows)
+	f.RenderFit(columns, rows, output.Layout{Flex: "Name", Drop: []string{"Listing"}})
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
+	listFooter{
+		noun:       companyNoun,
+		getCmd:     "nfn companies get",
+		pagination: pagination,
+		notes:      opts.notes(),
+		emptyHint:  "Try fewer filters, or --semantic to match --q by meaning.",
+	}.print(f, len(companies))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
 	return nil
+}
+
+// companyListing is a company's main listing as "VOLV-B · XSTO", or "unlisted",
+// so a list tells the tradable companies from the subsidiaries and private
+// firms a name search also finds.
+func companyListing(c api.Company) string {
+	switch {
+	case c.TickerSymbol == "":
+		return "unlisted"
+	case c.Exchange == nil || c.Exchange.MicCode == "":
+		return c.TickerSymbol
+	default:
+		return c.TickerSymbol + " · " + c.Exchange.MicCode
+	}
 }
 
 func init() {
@@ -478,3 +536,5 @@ func init() {
 	companiesCmd.AddCommand(companiesEventsCmd)
 	rootCmd.AddCommand(companiesCmd)
 }
+
+var companyNoun = [2]string{"company", "companies"}

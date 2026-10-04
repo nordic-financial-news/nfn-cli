@@ -72,7 +72,7 @@ var watchlistsGetCmd = &cobra.Command{
 
 		if len(companies) > 0 {
 			f.Println()
-			return renderCompanies(f, companies, nil, nil)
+			return renderCompanies(f, companies, nil, nil, listOpts{})
 		}
 
 		return nil

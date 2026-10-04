@@ -36,16 +36,16 @@ type renderFn func(f *output.Formatter, planLimited *bool) error
 func planLimitedRenderers() map[string]renderFn {
 	return map[string]renderFn{
 		"stories": func(f *output.Formatter, pl *bool) error {
-			return renderStories(f, []api.Story{{ID: "s1", Title: "A story"}}, nil, pl)
+			return renderStories(f, []api.Story{{ID: "s1", Title: "A story"}}, nil, pl, listOpts{})
 		},
 		"articles": func(f *output.Formatter, pl *bool) error {
-			return renderArticles(f, []api.Article{{ID: "a1", Title: "An article"}}, nil, pl)
+			return renderArticles(f, []api.Article{{ID: "a1", Title: "An article"}}, nil, pl, listOpts{})
 		},
 		"calendar events": func(f *output.Formatter, pl *bool) error {
 			return renderCalendarEvents(f, []api.CalendarEvent{{ID: "c1", Title: "An event"}}, nil, pl)
 		},
 		"companies": func(f *output.Formatter, pl *bool) error {
-			return renderCompanies(f, []api.Company{{ID: "co1", Name: "A company"}}, nil, pl)
+			return renderCompanies(f, []api.Company{{ID: "co1", Name: "A company"}}, nil, pl, listOpts{})
 		},
 	}
 }

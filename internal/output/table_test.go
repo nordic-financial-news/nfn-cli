@@ -137,6 +137,24 @@ func TestRenderDetailTableStaysWithinWidth(t *testing.T) {
 	}
 }
 
+// A wrapped list item indents under its own text, so it does not read as the
+// start of the next item.
+func TestWrapLinesHangsBulletedItems(t *testing.T) {
+	t.Parallel()
+	got := wrapLines(Bullet+"Orders fell 9.5% from a year earlier\n"+Bullet+"Short", 20)
+	for i, line := range strings.Split(got, "\n") {
+		if w := text.StringWidthWithoutEscSequences(line); w > 20 {
+			t.Errorf("line %d is %d cells: %q", i, w, line)
+		}
+		if !strings.HasPrefix(line, Bullet) && !strings.HasPrefix(line, "  ") {
+			t.Errorf("line %d = %q, want a bullet or a hanging indent", i, line)
+		}
+	}
+	if n := strings.Count(got, Bullet); n != 2 {
+		t.Errorf("got %d bullets, want 2\n%s", n, got)
+	}
+}
+
 func TestRenderFitSkipsAnEmptyTable(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer

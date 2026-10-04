@@ -125,14 +125,14 @@ var exchangesCompaniesCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return renderCompanies(f, companies, nil, planLimitedFrom(resp), "nfn exchanges companies")
+			return renderCompanies(f, companies, nil, planLimitedFrom(resp), listOpts{path: "nfn exchanges companies"})
 		}
 
 		companies, pagination, resp, err := client.ListExchangeCompanies(cmd.Context(), args[0], params)
 		if err != nil {
 			return err
 		}
-		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), "nfn exchanges companies")
+		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), listOpts{path: "nfn exchanges companies"})
 	},
 }
 

@@ -164,12 +164,23 @@ func Ellipsize(s string, width int) string {
 	return strings.TrimRight(b.String(), " ") + "…"
 }
 
+// Bullet starts a list item in a detail cell. wrapLines indents an item's
+// continuation lines under its text, so a wrapped item still reads as one.
+const Bullet = "• "
+
 // wrapLines soft-wraps each line of a cell on its own, so a value laid out one
 // item per line keeps that layout instead of being reflowed into a paragraph.
 func wrapLines(s string, width int) string {
+	indent := strings.Repeat(" ", text.StringWidthWithoutEscSequences(Bullet))
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
-		lines[i] = text.WrapSoft(line, width)
+		item, ok := strings.CutPrefix(line, Bullet)
+		if !ok || width <= len(indent) {
+			lines[i] = text.WrapSoft(line, width)
+			continue
+		}
+		wrapped := text.WrapSoft(item, width-len(indent))
+		lines[i] = Bullet + strings.ReplaceAll(wrapped, "\n", "\n"+indent)
 	}
 	return strings.Join(lines, "\n")
 }

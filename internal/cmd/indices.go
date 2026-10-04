@@ -124,14 +124,14 @@ var indicesCompaniesCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return renderCompanies(f, companies, nil, planLimitedFrom(resp), "nfn indices companies")
+			return renderCompanies(f, companies, nil, planLimitedFrom(resp), listOpts{path: "nfn indices companies"})
 		}
 
 		companies, pagination, resp, err := client.ListIndexCompanies(cmd.Context(), args[0], params)
 		if err != nil {
 			return err
 		}
-		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), "nfn indices companies")
+		return renderCompanies(f, companies, pagination, planLimitedFrom(resp), listOpts{path: "nfn indices companies"})
 	},
 }
 

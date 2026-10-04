@@ -51,14 +51,14 @@ var storiesListCmd = &cobra.Command{
 			if err != nil {
 				return watchlistFilterError(err, watchlistID)
 			}
-			return renderStories(f, stories, nil, planLimitedFrom(resp))
+			return renderStories(f, stories, nil, planLimitedFrom(resp), listOpts{order: orderNote(cmd, true)})
 		}
 
 		stories, pagination, resp, err := client.ListStories(cmd.Context(), params)
 		if err != nil {
 			return semanticError(watchlistFilterError(err, watchlistID), semantic)
 		}
-		return renderStories(f, stories, pagination, planLimitedFrom(resp))
+		return renderStories(f, stories, pagination, planLimitedFrom(resp), listOpts{order: orderNote(cmd, true)})
 	},
 }
 
@@ -74,7 +74,7 @@ var storiesGetCmd = &cobra.Command{
 
 		story, _, err := client.GetStory(cmd.Context(), args[0])
 		if err != nil {
-			return err
+			return notFoundError(err, fmt.Sprintf("no story has ID %q. Find one with 'nfn stories list'", args[0]))
 		}
 
 		if f.Format() == "json" {
@@ -155,7 +155,7 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	return params
 }
 
-func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pagination, planLimited *bool, cmdPath ...string) error {
+func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pagination, planLimited *bool, opts listOpts) error {
 	if f.Format() == "json" {
 		rows, err := narrowJSON(f.Fields(), stories)
 		if err != nil {
@@ -166,12 +166,8 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 			result["pagination"] = paginationJSON(pagination)
 		}
 		addPlanLimited(result, planLimited)
-		path := "nfn stories list"
-		if len(cmdPath) > 0 {
-			path = cmdPath[0]
-		}
-		summary := planLimitedSummary(fmt.Sprintf("%d stories", len(stories)), planLimited)
-		return f.RenderEnvelope(result, summary, breadcrumbsFor(path))
+		summary := planLimitedSummary(countNoun(len(stories), storyNoun), planLimited)
+		return f.RenderEnvelope(result, summary, breadcrumbsFor(opts.pathOr("nfn stories list")))
 	}
 
 	// Only a semantic search returns distances, so the column appears only when
@@ -201,7 +197,7 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
-	listFooter{noun: [2]string{"story", "stories"}, getCmd: "nfn stories get", pagination: pagination}.print(f, len(stories))
+	listFooter{noun: storyNoun, getCmd: "nfn stories get", pagination: pagination, notes: opts.notes()}.print(f, len(stories))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -233,3 +229,5 @@ func init() {
 	storiesCmd.AddCommand(storiesGetCmd)
 	rootCmd.AddCommand(storiesCmd)
 }
+
+var storyNoun = [2]string{"story", "stories"}

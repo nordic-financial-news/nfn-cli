@@ -52,7 +52,7 @@ var searchCmd = &cobra.Command{
 		printed := false
 		if len(results.Companies) > 0 {
 			f.Println("Companies:")
-			if err := renderCompanies(f, results.Companies, nil, nil); err != nil {
+			if err := renderCompanies(f, results.Companies, nil, nil, listOpts{}); err != nil {
 				return err
 			}
 			f.Println()
@@ -60,7 +60,7 @@ var searchCmd = &cobra.Command{
 		}
 		if len(results.Articles) > 0 {
 			f.Println("Articles:")
-			if err := renderArticles(f, results.Articles, nil, nil); err != nil {
+			if err := renderArticles(f, results.Articles, nil, nil, listOpts{}); err != nil {
 				return err
 			}
 			f.Println()
@@ -68,7 +68,7 @@ var searchCmd = &cobra.Command{
 		}
 		if len(results.Stories) > 0 {
 			f.Println("Stories:")
-			if err := renderStories(f, results.Stories, nil, nil); err != nil {
+			if err := renderStories(f, results.Stories, nil, nil, listOpts{}); err != nil {
 				return err
 			}
 			f.Println()

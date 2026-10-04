@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -192,5 +193,29 @@ func TestBuildArticleParams(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestArticlesGet_Detail(t *testing.T) {
+	body := `{"article":{"id":"art1","title":"Volvo orders fell","source_title":"Orderingången sjönk",` +
+		`"summary":"Orders fell.","article_url":"https://efn.se/a-very-long-path-that-must-stay-whole-1234567890",` +
+		`"content_type":"press_release","published_at":"2026-10-02T20:09:53.000Z","country":"SE",` +
+		`"source":{"name":"EFN","source_type":"news_publication"},` +
+		`"companies":[{"id":"co1","name":"AB Volvo","ticker":"VOLV-B"}],` +
+		`"key_points":["Orders fell 9.5%."],"event_id":"evt1"}}`
+
+	out := runCommandWithArgs(t, articlesGetCmd, fixedBody(body), "table", []string{"art1"})
+
+	if strings.Contains(out, "2026-10-02T20:09:53") {
+		t.Errorf("output = %q, want the time rendered for reading", out)
+	}
+	for _, want := range []string{
+		"• Orders fell 9.5%.", "VOLV-B  AB Volvo", "EFN (news publication)", "press release",
+		"Original Title", "Read the original:", "https://efn.se/a-very-long-path-that-must-stay-whole-1234567890",
+		"nfn events get evt1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
 	}
 }
