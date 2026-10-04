@@ -10,11 +10,11 @@ import (
 )
 
 type commandInfo struct {
-	Command     string            `json:"command"`
-	Description string            `json:"description"`
-	Flags       []flagInfo        `json:"flags"`
-	Arguments   string            `json:"arguments"`
-	Examples    []string          `json:"examples,omitempty"`
+	Command     string              `json:"command"`
+	Description string              `json:"description"`
+	Flags       []flagInfo          `json:"flags"`
+	Arguments   string              `json:"arguments"`
+	Examples    []string            `json:"examples,omitempty"`
 	Related     []output.Breadcrumb `json:"related,omitempty"`
 }
 

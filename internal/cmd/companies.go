@@ -280,6 +280,49 @@ var companiesStoriesCmd = &cobra.Command{
 	},
 }
 
+var companiesEventsCmd = &cobra.Command{
+	Use:   "events <identifier>",
+	Short: "List events for a company",
+	Long: `List events for a company, most recently reported first.
+
+The path fixes the company, so the filters that name a different company or
+listing — --ticker, --company, --watchlist-id, --listed, --exchange, --market,
+--domicile, --index and --sector — are not offered here. Use 'nfn events list'
+with --company to filter the full collection by any of them, and to search one
+company's events by meaning with --semantic.`,
+	Example: `  nfn companies events VOLV-B --limit 5
+  nfn companies events VOLV-B --significance notable
+  nfn companies events VOLV-B --event-type earnings-report
+  nfn companies events VOLV-B --window 30d
+  nfn companies events 64hn2d7ul6kr --all --format json`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := apiClientFromContext(cmd)
+		f := formatterFromContext(cmd)
+
+		if err := validateEventType(cmd); err != nil {
+			return err
+		}
+
+		params := buildEventParams(cmd)
+
+		all, _ := cmd.Flags().GetBool("all")
+		if all {
+			events, resp, err := client.ListAllCompanyEvents(cmd.Context(), args[0], params)
+			if err != nil {
+				return err
+			}
+			return renderEvents(f, events, nil, planLimitedFrom(resp), truncatedFrom(resp), "nfn companies events")
+		}
+
+		events, pagination, resp, err := client.ListCompanyEvents(cmd.Context(), args[0], params)
+		if err != nil {
+			return err
+		}
+		return renderEvents(f, events, pagination, planLimitedFrom(resp), truncatedFrom(resp), "nfn companies events")
+	},
+}
+
 func buildCompanyParams(cmd *cobra.Command) url.Values {
 	params := url.Values{}
 
@@ -415,9 +458,14 @@ func init() {
 	addCompanyNewsFilterFlags(companiesStoriesCmd)
 	addFieldsFlag(companiesStoriesCmd)
 
+	addEventFilterFlags(companiesEventsCmd)
+	addPaginationFlags(companiesEventsCmd)
+	addFieldsFlag(companiesEventsCmd)
+
 	companiesCmd.AddCommand(companiesListCmd)
 	companiesCmd.AddCommand(companiesGetCmd)
 	companiesCmd.AddCommand(companiesArticlesCmd)
 	companiesCmd.AddCommand(companiesStoriesCmd)
+	companiesCmd.AddCommand(companiesEventsCmd)
 	rootCmd.AddCommand(companiesCmd)
 }

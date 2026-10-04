@@ -290,8 +290,8 @@ func TestFormatDistance(t *testing.T) {
 	}
 }
 
-// The three list commands must all forward mode=semantic, and must not set it
-// when the flag is absent.
+// The four list commands offering --semantic must all forward mode=semantic,
+// and must not set it when the flag is absent.
 func TestSemanticParamMapping(t *testing.T) {
 	t.Parallel()
 
@@ -327,6 +327,15 @@ func TestSemanticParamMapping(t *testing.T) {
 				c.Flags().Bool("semantic", false, "")
 			},
 			build: func(c *cobra.Command) map[string][]string { return buildCompanyParams(c) },
+		},
+		{
+			name:   "events",
+			source: eventsListCmd,
+			register: func(c *cobra.Command) {
+				c.Flags().String("q", "", "")
+				c.Flags().Bool("semantic", false, "")
+			},
+			build: func(c *cobra.Command) map[string][]string { return buildEventParams(c) },
 		},
 	}
 

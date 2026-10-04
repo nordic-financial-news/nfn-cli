@@ -219,7 +219,7 @@ func semanticError(err error, semantic bool) error {
 	case apiErr.IsSemanticUnavailable():
 		return fmt.Errorf("semantic search is temporarily unavailable (the API returned 503). It never falls back to keyword matching, so either retry shortly or drop --semantic to run the same query lexically")
 	case apiErr.IsRateLimited():
-		msg := "rate limited by the API (429). Semantic requests draw on their own budget of 120 per hour per API key, shared across articles, stories, and companies and separate from the standard rate limit, so this may be that budget rather than the usual one"
+		msg := "rate limited by the API (429). Semantic requests draw on their own budget of 120 per hour per API key, shared across every semantic-mode resource and separate from the standard rate limit, so this may be that budget rather than the usual one"
 		if apiErr.RetryAfter > 0 {
 			msg += fmt.Sprintf(" — retry in %s", apiErr.RetryAfter.Round(time.Second))
 		}

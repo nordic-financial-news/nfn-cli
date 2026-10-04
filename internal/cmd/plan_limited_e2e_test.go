@@ -45,6 +45,13 @@ func fixedBody(body string) http.HandlerFunc {
 // These tests must not call t.Parallel: they mutate shared cobra flag state.
 func runListCommand(t *testing.T, cmd *cobra.Command, handler http.HandlerFunc, format string, args ...string) string {
 	t.Helper()
+	return runCommandWithArgs(t, cmd, handler, format, nil, args...)
+}
+
+// runCommandWithArgs is runListCommand for a command that takes positional
+// arguments, such as a detail route or a nested company route.
+func runCommandWithArgs(t *testing.T, cmd *cobra.Command, handler http.HandlerFunc, format string, cmdArgs []string, args ...string) string {
+	t.Helper()
 
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -60,7 +67,7 @@ func runListCommand(t *testing.T, cmd *cobra.Command, handler http.HandlerFunc, 
 	if err := c.ParseFlags(args); err != nil {
 		t.Fatalf("parsing flags: %v", err)
 	}
-	if err := c.RunE(&c, nil); err != nil {
+	if err := c.RunE(&c, cmdArgs); err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
 	return buf.String()

@@ -16,9 +16,9 @@ var authCmd = &cobra.Command{
 }
 
 var authLoginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Authenticate with your API key",
-	Long:  "Stores your API key in the system keyring. Get your key at https://nordicfinancialnews.com/account.",
+	Use:     "login",
+	Short:   "Authenticate with your API key",
+	Long:    "Stores your API key in the system keyring. Get your key at https://nordicfinancialnews.com/settings/api_keys.",
 	Example: `  nfn auth login`,
 	Annotations: map[string]string{
 		"skipAuth": "true",

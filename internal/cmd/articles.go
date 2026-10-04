@@ -134,6 +134,9 @@ human-verified. Use the article_url / URL field to reach the original source.`,
 		if len(article.KeyPoints) > 0 {
 			fields = append(fields, output.Field{Key: "Key Points", Value: strings.Join(article.KeyPoints, "\n")})
 		}
+		if article.EventID != "" {
+			fields = append(fields, output.Field{Key: "Event", Value: article.EventID})
+		}
 
 		f.RenderDetail(fields)
 		return nil

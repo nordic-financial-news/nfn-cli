@@ -67,7 +67,7 @@ var storiesGetCmd = &cobra.Command{
 	Short: "Get story details",
 	Example: `  nfn stories get abc123
   nfn stories get abc123 --format json`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
@@ -103,6 +103,9 @@ var storiesGetCmd = &cobra.Command{
 			{Key: "Category", Value: category},
 			{Key: "Articles", Value: strings.Join(story.ArticleIDs, ", ")},
 			{Key: "Companies", Value: strings.Join(companies, ", ")},
+		}
+		if story.EventID != "" {
+			fields = append(fields, output.Field{Key: "Event", Value: story.EventID})
 		}
 		if story.Content != "" {
 			fields = append(fields, output.Field{Key: "Content", Value: story.Content})

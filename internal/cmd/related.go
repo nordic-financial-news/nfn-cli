@@ -14,6 +14,7 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 	"nfn articles get": {
 		{Description: "List articles", Command: "nfn articles list"},
 		{Description: "View company details", Command: "nfn companies get <identifier>"},
+		{Description: "View the event this article reports", Command: "nfn events get <id>"},
 	},
 	"nfn companies list": {
 		{Description: "View company details", Command: "nfn companies get <identifier>"},
@@ -21,6 +22,7 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 	"nfn companies get": {
 		{Description: "List company articles", Command: "nfn companies articles <identifier>"},
 		{Description: "List company stories", Command: "nfn companies stories <identifier>"},
+		{Description: "List company events", Command: "nfn companies events <identifier>"},
 		{Description: "List company calendar events", Command: "nfn calendar list --ticker <ticker>"},
 		{Description: "List companies", Command: "nfn companies list"},
 	},
@@ -40,6 +42,7 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 	"nfn stories get": {
 		{Description: "List stories", Command: "nfn stories list"},
 		{Description: "View article details", Command: "nfn articles get <id>"},
+		{Description: "View the event behind this story", Command: "nfn events get <id>"},
 	},
 	"nfn calendar list": {
 		{Description: "View calendar event details", Command: "nfn calendar get <id>"},
@@ -50,6 +53,26 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 		{Description: "List calendar events", Command: "nfn calendar list"},
 		{Description: "View company details", Command: "nfn companies get <identifier>"},
 		{Description: "View source article", Command: "nfn articles get <id>"},
+	},
+	"nfn events list": {
+		{Description: "View event details", Command: "nfn events get <id>"},
+		{Description: "List event types", Command: "nfn event-types"},
+		{Description: "List articles", Command: "nfn articles list"},
+		{Description: "List stories", Command: "nfn stories list"},
+	},
+	"nfn events get": {
+		{Description: "View member article details", Command: "nfn articles get <id>"},
+		{Description: "View company details", Command: "nfn companies get <identifier>"},
+		{Description: "List commentary on this event", Command: "nfn events list --related-to <id>"},
+		{Description: "List events", Command: "nfn events list"},
+	},
+	"nfn event-types": {
+		{Description: "Filter events by type", Command: "nfn events list --event-type <slug>"},
+		{Description: "List events", Command: "nfn events list"},
+	},
+	"nfn companies events": {
+		{Description: "View event details", Command: "nfn events get <id>"},
+		{Description: "View company details", Command: "nfn companies get <identifier>"},
 	},
 	"nfn categories": {
 		{Description: "Filter articles by category", Command: "nfn articles list --category <id>"},
@@ -101,6 +124,7 @@ var commandBreadcrumbs = map[string][]output.Breadcrumb{
 		{Description: "List articles for this watchlist", Command: "nfn articles list --watchlist-id <id>"},
 		{Description: "List stories for this watchlist", Command: "nfn stories list --watchlist-id <id>"},
 		{Description: "List calendar events for this watchlist", Command: "nfn calendar list --watchlist-id <id>"},
+		{Description: "List events for this watchlist", Command: "nfn events list --watchlist-id <id>"},
 		{Description: "List watchlists", Command: "nfn watchlists list"},
 	},
 	"nfn doctor": {
