@@ -18,6 +18,9 @@ type Story struct {
 	CompanyIDs   []string  `json:"company_ids,omitempty"`
 	Companies    []Company `json:"companies,omitempty"`
 	Category     *Category `json:"category"`
+	// EventID is the underlying event this story was generated from, empty when
+	// the story has no underlying event.
+	EventID string `json:"event_id,omitempty"`
 	// Distance is the raw cosine distance to the query on a semantic search
 	// result. See Article.Distance.
 	Distance *float64 `json:"distance,omitempty"`

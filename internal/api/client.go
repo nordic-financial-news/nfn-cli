@@ -29,6 +29,12 @@ type Response struct {
 	// restriction applied, so nil ("the API said nothing") stays distinct from
 	// an explicit false.
 	PlanLimited *bool
+	// Truncated carries the top-level truncated flag, which only the semantic
+	// events search sends: true means the article-match horizon was exhausted,
+	// so further matching events exist that no cursor can reach. A semantic
+	// response has no next_cursor, so without this a knowingly incomplete page
+	// looks complete. Pointer semantics as for PlanLimited.
+	Truncated *bool
 }
 
 // ClientOption configures the Client.
@@ -139,7 +145,7 @@ func (c *Client) doGet(ctx context.Context, path string, params url.Values, resu
 		return apiResp, fmt.Errorf("reading response: %w", err)
 	}
 
-	apiResp.PlanLimited = extractPlanLimited(body)
+	apiResp.PlanLimited, apiResp.Truncated = extractResponseMeta(body)
 
 	if result != nil {
 		if err := json.Unmarshal(body, result); err != nil {
@@ -150,18 +156,21 @@ func (c *Client) doGet(ctx context.Context, path string, params url.Values, resu
 	return apiResp, nil
 }
 
-// extractPlanLimited pulls the top-level plan_limited flag out of a response
-// body. The API sets it on list endpoints when the caller's plan hid records
-// from the result, and omits it otherwise. Bodies that aren't JSON objects
-// yield nil rather than an error — this is metadata, not the payload.
-func extractPlanLimited(body []byte) *bool {
+// extractResponseMeta pulls the top-level flags out of a response body:
+// plan_limited, which list endpoints set when the caller's plan hid records from
+// the result, and truncated, which the semantic events search sets when further
+// matches exist beyond its reach. Both are omitted when they do not apply.
+// Bodies that aren't JSON objects yield nil rather than an error — this is
+// metadata, not the payload.
+func extractResponseMeta(body []byte) (planLimited, truncated *bool) {
 	var meta struct {
 		PlanLimited *bool `json:"plan_limited"`
+		Truncated   *bool `json:"truncated"`
 	}
 	if err := json.Unmarshal(body, &meta); err != nil {
-		return nil
+		return nil, nil
 	}
-	return meta.PlanLimited
+	return meta.PlanLimited, meta.Truncated
 }
 
 func parseRateLimitHeaders(h http.Header) *RateLimitInfo {

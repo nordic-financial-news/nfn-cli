@@ -52,9 +52,45 @@ func ListPage[T any](ctx context.Context, c *Client, path string, params url.Val
 
 // ListAll fetches all pages of results by following pagination cursors.
 func ListAll[T any](ctx context.Context, c *Client, path string, params url.Values, resourceKey string) ([]T, *Response, error) {
+	return listAll[T](ctx, c, path, params, resourceKey, nil)
+}
+
+// ListAllDeduped is ListAll for a feed whose cursor walk is at-least-once,
+// collecting each id once and keeping the copy from the latest page it appeared
+// on. id extracts that id.
+//
+// The events feed needs this: a merge takes the earlier of the two
+// first_reported_at values, so under the default newest-first sort a surviving
+// event only ever moves earlier, and a merge landing mid-walk can re-emit a row
+// an earlier page already returned. An updated_at walk re-emits for the same
+// reason, ordered ascending. Either way the repeat is caused by the record
+// changing, so the later copy is the current one — notably on a sync, where an
+// event merged mid-walk reappears as a tombstone that a first-wins policy would
+// discard, leaving the caller's mirror with an event the API no longer serves.
+//
+// Completeness differs by sort: the default order can only re-emit, never skip,
+// but sort=significance is a best-effort snapshot in which a mid-walk
+// routine-to-notable escalation can be missed altogether, which no client-side
+// dedupe can repair. The article and story feeds sort on an immutable
+// published_at and so cannot drift either way.
+func ListAllDeduped[T any](ctx context.Context, c *Client, path string, params url.Values, resourceKey string, id func(T) string) ([]T, *Response, error) {
+	return listAll[T](ctx, c, path, params, resourceKey, id)
+}
+
+// listAll walks every page. When id is non-nil, a record repeated across pages
+// is collected once, at the position it was first seen but with the content of
+// the last page that carried it.
+func listAll[T any](ctx context.Context, c *Client, path string, params url.Values, resourceKey string, id func(T) string) ([]T, *Response, error) {
 	var allItems []T
 	var lastResp *Response
 	var planLimited *bool
+
+	// Index into allItems rather than a presence flag, so a repeat can overwrite
+	// the stale copy in place instead of being dropped.
+	var seen map[string]int
+	if id != nil {
+		seen = make(map[string]int)
+	}
 
 	p := url.Values{}
 	for k, v := range params {
@@ -67,7 +103,20 @@ func ListAll[T any](ctx context.Context, c *Client, path string, params url.Valu
 			return allItems, resp, err
 		}
 		lastResp = resp
-		allItems = append(allItems, items...)
+
+		if seen == nil {
+			allItems = append(allItems, items...)
+		} else {
+			for _, item := range items {
+				key := id(item)
+				if i, ok := seen[key]; ok {
+					allItems[i] = item
+					continue
+				}
+				seen[key] = len(allItems)
+				allItems = append(allItems, item)
+			}
+		}
 
 		// A single restricted page makes the whole aggregate incomplete, so the
 		// flag is sticky once any page reports true.

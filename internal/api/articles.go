@@ -21,6 +21,10 @@ type Article struct {
 	CompanyIDs  []string  `json:"company_ids,omitempty"`
 	Country     string    `json:"country"`
 	KeyPoints   []string  `json:"key_points,omitempty"`
+	// EventID is the event this article belongs to, empty when it has not been
+	// assigned to one yet. A merged or removed event still resolves, to a
+	// tombstone.
+	EventID string `json:"event_id,omitempty"`
 	// Distance is the raw cosine distance to the query, present only on
 	// results from a semantic search (--semantic). Lower is closer. It is a
 	// pointer because a lexical result carries no distance at all, which is
