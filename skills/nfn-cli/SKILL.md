@@ -198,11 +198,17 @@ nfn articles list --fields "id,title,published_at"  # Narrows both the JSON keys
 not `reported`. An unknown name is rejected locally, and the error lists the names that feed
 accepts, so `--fields reported` costs no request. `nfn <command> --help` lists them too.
 
-A narrowed result omits what you did not ask for rather than reporting it empty: the JSON has
-no key for it, and the table has no column. So a field missing from the payload means "not
-requested", while `"country": ""` means the API really has no country. Asking for a field the
-table cannot show (`article_url`, `summary`) prints a note naming it and pointing at
-`--format json`. `id` comes back whether or not you ask for it.
+A narrowed result omits what you did not ask for rather than reporting it empty: the JSON
+carries only the fields you named, and the table only their columns. So a key that is present
+carries a real value, never a zero one standing in for a field you skipped. Among the fields
+you did ask for, one the API has no value for may still be absent rather than empty, so read
+absence as "empty or not requested" and let what you passed decide which.
+
+`id` comes back whether or not you ask for it, and keeps its table column. On a `--semantic`
+search `distance` also survives, since it is the ranking output rather than a field. Asking for
+a field the table cannot show (`article_url`, `summary`) prints a note naming it and pointing at
+`--format json`; `nfn event-types --fields id` is all note and no table, because that table has
+no id column.
 
 ## Quick Reference
 

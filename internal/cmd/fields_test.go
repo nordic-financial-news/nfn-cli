@@ -3,11 +3,14 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/nordic-financial-news/nfn-cli/internal/api"
 	"github.com/nordic-financial-news/nfn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -81,12 +84,14 @@ func TestValidateFieldsIgnoresCommandsWithoutTheFlag(t *testing.T) {
 	}
 }
 
-// TestSelectedFieldsMarksTheWholeVocabulary covers the three states a renderer
-// has to tell apart: requested, excluded, and not governed by --fields at all.
-func TestSelectedFieldsMarksTheWholeVocabulary(t *testing.T) {
+// TestSelectedFieldsReportsOnlyWhatWasAskedFor pins the contract the three
+// consumers read: the map holds the caller's request and nothing else, so no
+// consumer can mistake a field the API happens to return for one that was asked
+// about.
+func TestSelectedFieldsReportsOnlyWhatWasAskedFor(t *testing.T) {
 	restoreFlags(t, eventsListCmd)
 	cmd := *eventsListCmd
-	if err := cmd.Flags().Set("fields", "title"); err != nil {
+	if err := cmd.Flags().Set("fields", "title, significance ,"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,17 +99,14 @@ func TestSelectedFieldsMarksTheWholeVocabulary(t *testing.T) {
 	if want == nil {
 		t.Fatal("selectedFields() = nil, want a selection")
 	}
-	if !want["title"] {
-		t.Error("title was requested but is not marked true")
+	if len(want) != 2 || !want["title"] || !want["significance"] {
+		t.Errorf("selectedFields() = %v, want exactly title and significance, whitespace trimmed", want)
 	}
-	if !want["id"] {
-		t.Error("id must be true: the API returns it whether or not it is asked for")
+	if want["id"] {
+		t.Error("id must not be marked requested: nobody asked for it")
 	}
-	if requested, governed := want["article_count"]; !governed || requested {
-		t.Errorf("article_count = (%v, governed %v), want (false, true)", requested, governed)
-	}
-	if _, governed := want["distance"]; governed {
-		t.Error("distance must not be governed by --fields: the flag can neither request nor suppress it")
+	if want["article_count"] {
+		t.Error("an unrequested vocabulary field must not be marked requested")
 	}
 }
 
@@ -342,4 +344,226 @@ func TestFieldsEndToEnd(t *testing.T) {
 			t.Error("a rejected selection must not be recorded on the formatter")
 		}
 	})
+}
+
+// TestNarrowJSONDropsKeysOutsideTheVocabulary covers the shape that made a
+// narrowed payload lie: a struct field the vocabulary does not name and the json
+// tag does not mark omitempty. The API projected it away, so Go's zero value is
+// all that is left, and emitting it asserts that the company is inactive and has
+// no exchange.
+func TestNarrowJSONDropsKeysOutsideTheVocabulary(t *testing.T) {
+	type row struct {
+		ID       string    `json:"id"`
+		Name     string    `json:"name"`
+		IsActive bool      `json:"is_active"`
+		Exchange *struct{} `json:"exchange"`
+		Distance *float64  `json:"distance,omitempty"`
+	}
+	d := 0.39
+	in := []row{{ID: "c1", Name: "Volvo", Distance: &d}}
+
+	out, err := narrowJSON(map[string]bool{"name": true}, in)
+	if err != nil {
+		t.Fatalf("narrowJSON() = %v", err)
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []map[string]interface{}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []string{"is_active", "exchange"} {
+		if _, present := got[0][key]; present {
+			t.Errorf("%s survived narrowing, asserting a value the API never returned", key)
+		}
+	}
+	if got[0]["name"] != "Volvo" {
+		t.Errorf("name = %v, want it kept", got[0]["name"])
+	}
+	if got[0]["id"] != "c1" {
+		t.Error("id was dropped, but the API returns it whether or not it was asked for")
+	}
+	if _, present := got[0]["distance"]; !present {
+		t.Error("distance was dropped: the API merges it after projecting, so --fields cannot suppress it")
+	}
+}
+
+// TestNarrowColumnsKeepsTheIDColumnUnrequested: id comes back either way and is
+// the argument every get command takes, so its column is worth keeping.
+func TestNarrowColumnsKeepsTheIDColumnUnrequested(t *testing.T) {
+	columns := []string{"ID", "Title", "Reported"}
+	rows := [][]string{{"e1", "A title", "2026-10-01"}}
+	colFields := [][]string{{"id"}, {"title"}, {"first_reported_at"}}
+
+	gotCols, gotRows := narrowColumns(map[string]bool{"title": true}, columns, rows, colFields)
+	if strings.Join(gotCols, ",") != "ID,Title" {
+		t.Errorf("columns = %v, want [ID Title]", gotCols)
+	}
+	if strings.Join(gotRows[0], ",") != "e1,A title" {
+		t.Errorf("rows = %v, want the id cell kept", gotRows)
+	}
+}
+
+// TestNarrowColumnsPadsShortRows: a row shorter than the header set keeps a blank
+// in place, so the cells after it stay under their own headers instead of sliding
+// left under the wrong ones.
+func TestNarrowColumnsPadsShortRows(t *testing.T) {
+	columns := []string{"ID", "Title", "Status", "Reported"}
+	rows := [][]string{{"e1", "A title", "confirmed", "2026-10-01"}, {"e2"}}
+	colFields := [][]string{{"id"}, {"title"}, {"status"}, {"first_reported_at"}}
+
+	gotCols, gotRows := narrowColumns(map[string]bool{"title": true, "status": true}, columns, rows, colFields)
+	if strings.Join(gotCols, ",") != "ID,Title,Status" {
+		t.Fatalf("columns = %v, want Reported dropped so the pad path is reached", gotCols)
+	}
+	if len(gotRows[1]) != 3 {
+		t.Fatalf("short row = %v, want 3 cells to match the 3 kept columns", gotRows[1])
+	}
+	if gotRows[1][0] != "e2" || gotRows[1][1] != "" || gotRows[1][2] != "" {
+		t.Errorf("short row = %v, want [e2 \"\" \"\"]", gotRows[1])
+	}
+}
+
+// TestFieldsWithoutColumnReportsIDWhenNoColumnShowsIt covers nfn event-types,
+// whose table is Slug/Label/Category/Summary. --fields id narrows that to nothing,
+// and without the note the caller gets an empty table and no reason for it.
+func TestFieldsWithoutColumnReportsIDWhenNoColumnShowsIt(t *testing.T) {
+	colFields := [][]string{{"slug"}, {"label"}, {"category"}, {"summary"}}
+
+	missing := fieldsWithoutColumn(map[string]bool{"id": true}, colFields)
+	if strings.Join(missing, ",") != "id" {
+		t.Errorf("missing = %v, want [id]: this table has no id column", missing)
+	}
+	if note := noColumnNote(missing); !strings.Contains(note, "id has no table column") {
+		t.Errorf("note = %q, want it to name id", note)
+	}
+
+	// The reverse: an unrequested id must never be named, or every narrowed
+	// event-types table would report a field nobody asked about.
+	if m := fieldsWithoutColumn(map[string]bool{"label": true}, colFields); len(m) != 0 {
+		t.Errorf("missing = %v, want none: id was not requested", m)
+	}
+}
+
+// TestEveryVocabularyFieldCanSurviveTheRoundTrip keeps each vocabulary and the
+// struct it narrows in step. A name the API accepts but the struct has no json
+// tag for is dropped on unmarshal, so --fields would advertise a field and then
+// return a payload without it.
+func TestEveryVocabularyFieldCanSurviveTheRoundTrip(t *testing.T) {
+	structs := map[string]interface{}{
+		"article":        api.Article{},
+		"story":          api.Story{},
+		"event":          api.Event{},
+		"event_type":     api.EventTypeDetail{},
+		"calendar_event": api.CalendarEvent{},
+		"company":        api.Company{},
+		"source":         api.Source{},
+		"exchange":       api.ExchangeDetail{},
+		"index":          api.StockIndex{},
+	}
+	for resource := range fieldVocabularies {
+		if _, ok := structs[resource]; !ok {
+			t.Errorf("vocabulary %q has no struct listed here, so nothing checks it", resource)
+		}
+	}
+
+	for resource, v := range structs {
+		tags := map[string]bool{}
+		typ := reflect.TypeOf(v)
+		for i := 0; i < typ.NumField(); i++ {
+			name := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
+			if name != "" && name != "-" {
+				tags[name] = true
+			}
+		}
+		for _, field := range fieldVocabularies[resource] {
+			if !tags[field] {
+				t.Errorf("%s vocabulary offers %q, but %T has no json tag for it, so the value is dropped",
+					resource, field, v)
+			}
+		}
+	}
+}
+
+// TestEveryFieldsCommandNarrowsItsJSON is the structural guard: a renderer that
+// narrows its table but forgets narrowJSON looks right in a terminal and keeps
+// emitting zero values to the agents the envelope exists for. Three renderers
+// shipped that way. The mock returns id plus one field, so every other key in
+// the payload can only be a zero value Go filled in.
+func TestEveryFieldsCommandNarrowsItsJSON(t *testing.T) {
+	tests := []struct {
+		name       string
+		cmd        *cobra.Command
+		collection string
+		fields     string
+		// extra is the one requested field beyond id, and the value the mock returns.
+		extraKey, extraVal string
+	}{
+		{"articles", articlesListCmd, "articles", "id,title", "title", "Saab lands order"},
+		{"stories", storiesListCmd, "stories", "id,title", "title", "A story"},
+		{"events", eventsListCmd, "events", "id,title", "title", "An event"},
+		{"event-types", eventTypesCmd, "event_types", "id,label", "label", "CEO Departure"},
+		{"calendar", calendarListCmd, "calendar_events", "id,title", "title", "Q3 report"},
+		{"companies", companiesListCmd, "companies", "id,name", "name", "Volvo"},
+		{"sources", sourcesListCmd, "sources", "id,name", "name", "Yle"},
+		{"exchanges", exchangesListCmd, "exchanges", "id,name", "name", "Nasdaq Stockholm"},
+		{"indices", indicesListCmd, "indices", "id,name", "name", "OMXS30"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			row, err := json.Marshal(map[string]string{"id": "x1", tc.extraKey: tc.extraVal})
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := fmt.Sprintf(`{%q:[%s],"pagination":{"count":1}}`, tc.collection, row)
+			out := runListCommand(t, tc.cmd, fixedBody(body), "json", "--fields", tc.fields)
+
+			var env struct {
+				Data map[string]json.RawMessage `json:"data"`
+			}
+			if err := json.Unmarshal([]byte(out), &env); err != nil {
+				t.Fatalf("output is not valid JSON: %v\ngot:\n%s", err, out)
+			}
+			var rows []map[string]interface{}
+			if err := json.Unmarshal(env.Data[tc.collection], &rows); err != nil {
+				t.Fatalf("decoding %s: %v\ngot:\n%s", tc.collection, err, out)
+			}
+			if len(rows) != 1 {
+				t.Fatalf("got %d rows, want 1", len(rows))
+			}
+
+			requested := map[string]bool{"id": true, tc.extraKey: true}
+			for key, value := range rows[0] {
+				if !requested[key] && !passThroughJSONKeys[key] {
+					t.Errorf("key %q is present as %v; it was not requested, so it can only be a zero value", key, value)
+				}
+			}
+			if rows[0][tc.extraKey] != tc.extraVal {
+				t.Errorf("%s = %v, want %q kept", tc.extraKey, rows[0][tc.extraKey], tc.extraVal)
+			}
+		})
+	}
+}
+
+// TestArticleAndStoryVocabulariesAcceptEventID: the OpenAPI fields description
+// for both feeds omits event_id, but the server's ALLOWED_ARTICLE_FIELDS and
+// ALLOWED_STORY_FIELDS accept it. The vocabularies were built from the spec and
+// inherited the omission, which made the CLI reject a field the API serves.
+// Trimming either vocabulary back to the spec would reintroduce that.
+func TestArticleAndStoryVocabulariesAcceptEventID(t *testing.T) {
+	for _, resource := range []string{"article", "story"} {
+		found := false
+		for _, name := range fieldVocabularies[resource] {
+			if name == "event_id" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s vocabulary is missing event_id, which the API accepts", resource)
+		}
+	}
 }

@@ -22,11 +22,11 @@ import (
 var fieldVocabularies = map[string][]string{
 	"article": {
 		"id", "title", "article_url", "published_at", "updated_at",
-		"content_type", "source", "company_ids", "country", "category",
+		"content_type", "source", "company_ids", "country", "category", "event_id",
 	},
 	"story": {
 		"id", "title", "summary", "published_at", "updated_at",
-		"article_count", "article_ids", "country", "category", "company_ids",
+		"article_count", "article_ids", "country", "category", "company_ids", "event_id",
 	},
 	"event": {
 		"id", "title", "status", "significance", "event_type", "article_count",
@@ -45,6 +45,14 @@ var fieldVocabularies = map[string][]string{
 	"exchange": {"id", "name", "mic_code", "acronym", "country"},
 	"index":    {"id", "name", "symbol", "pan_nordic", "exchange"},
 }
+
+// passThroughJSONKeys names the keys a --fields selection neither requests nor
+// suppresses, because the API merges them onto a row after it has projected it.
+// distance is the semantic search's ranking output rather than a field of any
+// resource, and a projected row with the scores stripped out would be
+// uninterpretable. Keys merged before the projection (company_sentiment,
+// coverage_sentiment) are stripped by the API itself and need no entry here.
+var passThroughJSONKeys = map[string]bool{"distance": true}
 
 // fieldsResourceAnnotation remembers which vocabulary a command's --fields
 // belongs to. The flag is registered per command, so the annotation travels with
@@ -107,16 +115,14 @@ func validateFields(cmd *cobra.Command) error {
 		strings.Join(unknown, ", "), verb, strings.Join(vocab, ", "))
 }
 
-// selectedFields reports which of a feed's fields a command asked for, or nil
-// when --fields was not set.
+// selectedFields reports the fields a command asked for, or nil when --fields was
+// not set.
 //
-// Every name in the feed's vocabulary is present in the result, false when it was
-// not requested, because a renderer needs to tell three cases apart: a field that
-// was requested, one the selection excluded, and a key the selection does not
-// govern at all. A semantic distance is the third case: --fields cannot ask for
-// it and cannot suppress it, so it must survive narrowing untouched.
-//
-// id is always true: the API returns it whether or not it was asked for.
+// id is absent unless the caller named it. The API returns id either way, but
+// what that should mean differs by consumer: the JSON keeps it, the table keeps
+// its column, and the note about fields with no column must not name a field
+// nobody asked about. Each decides for itself rather than reading a forced entry
+// here as a request.
 func selectedFields(cmd *cobra.Command) map[string]bool {
 	resource := cmd.Annotations[fieldsResourceAnnotation]
 	if resource == "" {
@@ -127,15 +133,14 @@ func selectedFields(cmd *cobra.Command) map[string]bool {
 		return nil
 	}
 	want := make(map[string]bool, len(fieldVocabularies[resource]))
-	for _, name := range fieldVocabularies[resource] {
-		want[name] = false
-	}
 	for _, name := range strings.Split(v, ",") {
 		if name = strings.TrimSpace(name); name != "" {
 			want[name] = true
 		}
 	}
-	want["id"] = true
+	if len(want) == 0 {
+		return nil
+	}
 	return want
 }
 
@@ -158,8 +163,10 @@ func applyFieldSelection(cmd *cobra.Command, f *output.Formatter) error {
 //
 // colFields gives the field names behind each column, in the same order. A column
 // survives if any of its fields was requested, so a column fed by either of two
-// fields survives on either. A column with no field listed is never dropped,
-// because nothing in the selection governs it.
+// fields survives on either. An id column survives unrequested, because the API
+// returns id whether or not it was asked for and it is the handle every get
+// command takes. A column with no field listed is never dropped, because nothing
+// in the selection governs it.
 func narrowColumns(want map[string]bool, columns []string, rows [][]string, colFields [][]string) ([]string, [][]string) {
 	if want == nil {
 		return columns, rows
@@ -171,7 +178,7 @@ func narrowColumns(want map[string]bool, columns []string, rows [][]string, colF
 			continue
 		}
 		for _, name := range colFields[i] {
-			if want[name] {
+			if want[name] || name == "id" {
 				keep = append(keep, i)
 				break
 			}
@@ -187,10 +194,12 @@ func narrowColumns(want map[string]bool, columns []string, rows [][]string, colF
 	}
 	out := make([][]string, len(rows))
 	for i, row := range rows {
-		cells := make([]string, 0, len(keep))
-		for _, c := range keep {
+		// A short row keeps a blank cell in place rather than being compacted,
+		// so the cells that follow stay under their own headers.
+		cells := make([]string, len(keep))
+		for j, c := range keep {
 			if c < len(row) {
-				cells = append(cells, row[c])
+				cells[j] = row[c]
 			}
 		}
 		out[i] = cells
@@ -213,9 +222,7 @@ func fieldsWithoutColumn(want map[string]bool, colFields [][]string) []string {
 	}
 	var missing []string
 	for name, requested := range want {
-		// id is returned rather than asked for, and every table leads with it,
-		// so it is never the thing a caller is missing.
-		if requested && name != "id" && !shown[name] {
+		if requested && !shown[name] {
 			missing = append(missing, name)
 		}
 	}
@@ -236,14 +243,14 @@ func noColumnNote(missing []string) string {
 		strings.Join(missing, ", "), has, them)
 }
 
-// narrowJSON drops the keys a --fields selection left out, so a field that was
-// not requested is absent from the payload instead of appearing as "" or null.
-// The CLI serializes whole structs, so without this a caller cannot tell a field
-// it did not ask for from one the API reports as empty.
+// narrowJSON keeps the keys the caller asked for and drops the rest, so a field
+// that was not requested is absent from the payload instead of appearing as ""
+// or null. The API has already projected the row; what this undoes is the zero
+// value Go fills in for every struct field the projection left out, which would
+// otherwise assert that a company is inactive or an exchange has no currency.
 //
-// Only keys the selection governs are removed. A key the vocabulary does not
-// name — a semantic distance, say — is passed through, since --fields neither
-// requests nor suppresses it.
+// id survives unrequested because the API returns it either way, and so does a
+// key in passThroughJSONKeys.
 func narrowJSON(want map[string]bool, v interface{}) (interface{}, error) {
 	if want == nil {
 		return v, nil
@@ -258,7 +265,7 @@ func narrowJSON(want map[string]bool, v interface{}) (interface{}, error) {
 	}
 	for _, row := range rows {
 		for key := range row {
-			if requested, governed := want[key]; governed && !requested {
+			if !want[key] && key != "id" && !passThroughJSONKeys[key] {
 				delete(row, key)
 			}
 		}

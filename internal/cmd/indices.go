@@ -137,7 +137,11 @@ var indicesCompaniesCmd = &cobra.Command{
 
 func renderIndices(f *output.Formatter, indices []api.StockIndex, pagination *api.Pagination) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"indices": indices}
+		rows, err := narrowJSON(f.Fields(), indices)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"indices": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}

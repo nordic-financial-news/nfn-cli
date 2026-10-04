@@ -138,7 +138,11 @@ var exchangesCompaniesCmd = &cobra.Command{
 
 func renderExchanges(f *output.Formatter, exchanges []api.ExchangeDetail, pagination *api.Pagination) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"exchanges": exchanges}
+		rows, err := narrowJSON(f.Fields(), exchanges)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"exchanges": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}

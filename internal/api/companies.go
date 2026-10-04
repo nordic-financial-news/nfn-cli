@@ -6,10 +6,14 @@ import (
 )
 
 type Company struct {
-	ID            string          `json:"id"`
-	Name          string          `json:"name"`
-	Slug          string          `json:"slug"`
-	TickerSymbol  string          `json:"ticker"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	TickerSymbol string `json:"ticker"`
+	// FormerTickers are symbols of delisted listings, minus any symbol an active
+	// listing still holds. Requestable via --fields, so the field has to exist for
+	// the value to survive the round trip.
+	FormerTickers []string        `json:"former_tickers,omitempty"`
 	IsActive      bool            `json:"is_active"`
 	Exchange      *Exchange       `json:"exchange"`
 	Country       *CompanyCountry `json:"country,omitempty"`

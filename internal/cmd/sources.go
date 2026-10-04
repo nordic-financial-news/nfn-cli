@@ -56,7 +56,11 @@ var sourcesListCmd = &cobra.Command{
 
 func renderSources(f *output.Formatter, sources []api.Source, pagination *api.Pagination) error {
 	if f.Format() == "json" {
-		result := map[string]interface{}{"sources": sources}
+		rows, err := narrowJSON(f.Fields(), sources)
+		if err != nil {
+			return err
+		}
+		result := map[string]interface{}{"sources": rows}
 		if pagination != nil {
 			result["pagination"] = paginationJSON(pagination)
 		}
