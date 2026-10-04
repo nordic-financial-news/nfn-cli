@@ -90,6 +90,14 @@ func TestFitTable(t *testing.T) {
 		}
 	})
 
+	t.Run("a lower floor keeps columns that a default floor drops", func(t *testing.T) {
+		t.Parallel()
+		gotCols, _ := fitTable(columns, rows, 70, Layout{Flex: "Title", Drop: layout.Drop, Floor: 20})
+		if !reflect.DeepEqual(gotCols, columns) {
+			t.Errorf("columns = %v, want all four kept", gotCols)
+		}
+	})
+
 	t.Run("no flex column means no change", func(t *testing.T) {
 		t.Parallel()
 		gotCols, _ := fitTable(columns, rows, 20, Layout{Flex: "Summary", Drop: []string{"Type"}})

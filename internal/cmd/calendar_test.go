@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
 )
@@ -162,7 +165,7 @@ func TestBuildCalendarParams(t *testing.T) {
 	}
 }
 
-func TestEventCompany(t *testing.T) {
+func TestCalendarCompanyCell(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -171,73 +174,180 @@ func TestEventCompany(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "prefers inline company name",
-			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{ID: "cmpny1234567", Name: "Telefonaktiebolaget LM Ericsson", Ticker: "ERIC-B"}},
-			want:  "Telefonaktiebolaget LM Ericss…",
+			name:  "a listed issuer is named by ticker",
+			event: api.CalendarEvent{CompanyID: "uejazctgchj4", Company: &api.CalendarCompany{Name: "AB Volvo", Ticker: "VOLV-B"}},
+			want:  "VOLV-B",
+		},
+		{
+			name:  "an unlisted issuer is named, cut to fit",
+			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{Name: "Telefonaktiebolaget LM Ericsson"}},
+			want:  "Telefonaktiebolaget…",
 		},
 		{
 			name:  "falls back to company_id when no inline company",
 			event: api.CalendarEvent{CompanyID: "cmpny1234567"},
 			want:  "cmpny1234567",
 		},
-		{
-			name:  "falls back to company_id when inline company has no name",
-			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{ID: "cmpny1234567"}},
-			want:  "cmpny1234567",
-		},
-		{
-			name:  "short name returned in full",
-			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{Name: "Volvo"}},
-			want:  "Volvo",
-		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := eventCompany(tt.event); got != tt.want {
-				t.Errorf("eventCompany() = %q, want %q", got, tt.want)
+			if got := calendarCompanyCell(tt.event); got != tt.want {
+				t.Errorf("calendarCompanyCell() = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestEventDate(t *testing.T) {
+func TestCalendarListWhen(t *testing.T) {
 	t.Parallel()
 
+	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name  string
 		event api.CalendarEvent
 		want  string
 	}{
 		{
-			name:  "prefers local_time date",
-			event: api.CalendarEvent{LocalTime: "2026-10-22T07:00:00.000+02:00", ScheduledAt: "2026-10-22T05:00:00.000Z"},
-			want:  "2026-10-22",
+			name:  "a date with no announced time shows the day alone",
+			event: api.CalendarEvent{DatePrecision: "day", LocalTime: "2026-10-23T00:00:00.000+02:00", ScheduledAt: "2026-10-22T22:00:00.000Z"},
+			want:  "Fri 23 Oct",
 		},
 		{
-			name:  "falls back to scheduled_at when local_time empty",
-			event: api.CalendarEvent{ScheduledAt: "2026-04-24T22:00:00.000Z"},
-			want:  "2026-04-24",
+			name:  "an announced time is shown on the issuer's clock",
+			event: api.CalendarEvent{DatePrecision: "exact", LocalTime: "2026-10-05T10:00:00.000+02:00"},
+			want:  "Mon 5 Oct 10:00",
 		},
 		{
-			name:  "short string returned as-is without panic",
+			name:  "another year names it",
+			event: api.CalendarEvent{DatePrecision: "day", LocalTime: "2027-02-04T00:00:00.000+01:00"},
+			want:  "4 Feb 2027",
+		},
+		{
+			name:  "unparseable is shown as received",
 			event: api.CalendarEvent{LocalTime: "2026"},
 			want:  "2026",
 		},
-		{
-			name:  "empty event yields empty string",
-			event: api.CalendarEvent{},
-			want:  "",
-		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := eventDate(tt.event); got != tt.want {
-				t.Errorf("eventDate() = %q, want %q", got, tt.want)
+			if got := calendarListWhen(tt.event, now); got != tt.want {
+				t.Errorf("calendarListWhen() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCalendarDetailWhen(t *testing.T) {
+	t.Parallel()
+
+	day := &api.CalendarEvent{DatePrecision: "day", LocalTime: "2026-10-23T00:00:00.000+02:00", Timezone: "Europe/Stockholm"}
+	if got, want := calendarDetailWhen(day), "Fri 23 Oct 2026, time not announced"; got != want {
+		t.Errorf("day precision = %q, want %q", got, want)
+	}
+	exact := &api.CalendarEvent{DatePrecision: "exact", LocalTime: "2026-10-05T10:00:00.000+02:00", Timezone: "Europe/Oslo"}
+	if got, want := calendarDetailWhen(exact), "Mon 5 Oct 2026, 10:00 Oslo time"; got != want {
+		t.Errorf("exact = %q, want %q", got, want)
+	}
+}
+
+func TestCalendarList_Table(t *testing.T) {
+	body := `{"calendar_events":[` +
+		`{"id":"ly89wavugvsl","title":"Q3 2026 Interim Report","event_type":"earnings_report","status":"scheduled",` +
+		`"date_precision":"day","local_time":"2026-10-23T00:00:00.000+02:00","company_id":"uejazctgchj4",` +
+		`"company":{"id":"uejazctgchj4","name":"AB Volvo","ticker":"VOLV-B"}}],"pagination":{"count":1}}`
+
+	t.Run("type and ticker shown, an all-scheduled page has no Status column", func(t *testing.T) {
+		out := runListCommand(t, calendarListCmd, fixedBody(body), "table", "--ticker", "VOLV-B")
+		for _, want := range []string{"Earnings", "VOLV-B", "1 calendar event (from today)."} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "STATUS") || strings.Contains(out, "earnings_report") {
+			t.Errorf("output has a Status column or a raw slug\n%s", out)
+		}
+	})
+
+	t.Run("a cancelled row brings in the Status column", func(t *testing.T) {
+		cancelled := strings.Replace(body, `"status":"scheduled"`, `"status":"cancelled"`, 1)
+		out := runListCommand(t, calendarListCmd, fixedBody(cancelled), "table", "--ticker", "VOLV-B")
+		if !strings.Contains(out, "STATUS") || !strings.Contains(out, "cancelled") {
+			t.Errorf("output = %q, want the cancellation shown", out)
+		}
+	})
+
+	t.Run("an empty upcoming page says past dates need a window", func(t *testing.T) {
+		empty := `{"calendar_events":[],"pagination":{"count":0}}`
+		out := runListCommand(t, calendarListCmd, fixedBody(empty), "table", "--ticker", "VOLV-B")
+		if !strings.Contains(out, "Only upcoming dates are listed; add --scheduled-after") {
+			t.Errorf("output = %q, want the upcoming-only default explained", out)
+		}
+	})
+
+	// Either end of a window, or a sync, lifts the API's upcoming-only default.
+	for _, flag := range []string{"--scheduled-after", "--scheduled-before", "--updated-after"} {
+		t.Run(flag+" drops the from-today note", func(t *testing.T) {
+			out := runListCommand(t, calendarListCmd, fixedBody(body), "table", flag, "2026-01-01")
+			if strings.Contains(out, "from today") {
+				t.Errorf("output = %q, want no from-today note", out)
+			}
+		})
+	}
+
+	t.Run("an announced time names whose clock it is on", func(t *testing.T) {
+		exact := strings.Replace(body, `"date_precision":"day"`, `"date_precision":"exact"`, 1)
+		out := runListCommand(t, calendarListCmd, fixedBody(exact), "table", "--scheduled-after", "2026-01-01")
+		if !strings.Contains(out, "(times are each issuer's local time)") {
+			t.Errorf("output = %q, want the clock named", out)
+		}
+	})
+
+	t.Run("a capped plan is not told to widen the window", func(t *testing.T) {
+		empty := `{"calendar_events":[],"pagination":{"count":0},"plan_limited":true}`
+		out := runListCommand(t, calendarListCmd, fixedBody(empty), "table", "--ticker", "VOLV-B")
+		if strings.Contains(out, "--scheduled-after") {
+			t.Errorf("output = %q, want no advice the plan cannot follow", out)
+		}
+	})
+
+	// The When column reads local_time and date_precision, so a narrowed table
+	// fetches them whichever of its fields was named.
+	t.Run("a narrowed table fetches what the When column needs", func(t *testing.T) {
+		var got string
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			got = r.URL.Query().Get("fields")
+			fixedBody(body)(w, r)
+		}
+		runListCommand(t, calendarListCmd, handler, "table", "--fields", "scheduled_at,title")
+		if !strings.Contains(got, "local_time") || !strings.Contains(got, "date_precision") {
+			t.Errorf("requested fields = %q, want local_time and date_precision added", got)
+		}
+	})
+}
+
+func TestCalendarGet_Detail(t *testing.T) {
+	body := `{"calendar_event":{"id":"4q3a0q706wcm","title":"Cash Dividend","event_type":"dividend","status":"scheduled",` +
+		`"date_precision":"day","local_time":"2026-10-05T00:00:00.000+02:00","timezone":"Europe/Stockholm",` +
+		`"fiscal_period":"fy_2025","source_article_id":"art1","company_id":"co1",` +
+		`"company":{"id":"co1","name":"Thule Group AB","ticker":"THULE"},` +
+		`"dividend":{"record_date":"2026-10-05","payment_date":"2026-10-08","kind":"ordinary"},` +
+		`"updated_at":"2026-09-25T14:17:49.048Z"}}`
+
+	out := runCommandWithArgs(t, calendarGetCmd, fixedBody(body), "table", []string{"4q3a0q706wcm"})
+
+	for _, want := range []string{
+		"Dividend", "FY 2025", "Mon 5 Oct 2026, time not announced", "THULE  Thule Group AB",
+		"Thu 8 Oct 2026", "nfn companies get THULE", "nfn articles get art1", "nfn calendar list --ticker THULE",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{"Ex-Dividend", "Declared", "2026-09-25T14:17", "T00:00:00"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("output has %q\n%s", unwanted, out)
+		}
 	}
 }

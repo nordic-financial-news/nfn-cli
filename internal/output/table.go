@@ -46,12 +46,15 @@ func termWidth(w io.Writer) int {
 // Layout says how a list table fits its width. Flex names the column that
 // takes whatever width the others leave, truncated to fit rather than
 // clipped. Drop names columns, least important first, removed whole before
-// Flex is cut below flexFloor. A column named in neither keeps its full width,
-// which is what keeps an ID column intact: it is the handle every get command
-// takes, so it is never a candidate.
+// Flex is cut below Floor, or flexFloor when Floor is zero. A table whose
+// other columns carry more than its Flex column, such as a calendar's type and
+// company beside a title that repeats them, sets a lower Floor. A column named
+// in neither keeps its full width, which is what keeps an ID column intact: it
+// is the handle every get command takes, so it is never a candidate.
 type Layout struct {
-	Flex string
-	Drop []string
+	Flex  string
+	Drop  []string
+	Floor int
 }
 
 // tableWidth is the rendered width of a bordered row with these column widths:
@@ -100,8 +103,12 @@ func fitTable(columns []string, rows [][]string, width int, layout Layout) ([]st
 		return width - tableWidth(widths) - 3
 	}
 
+	floor := layout.Floor
+	if floor == 0 {
+		floor = flexFloor
+	}
 	for _, name := range layout.Drop {
-		if room() >= flexFloor || room() >= natural[flex] {
+		if room() >= floor || room() >= natural[flex] {
 			break
 		}
 		if i := indexOf(columns, name); i >= 0 && i != flex {

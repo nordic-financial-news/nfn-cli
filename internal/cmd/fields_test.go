@@ -137,7 +137,7 @@ func TestNarrowColumnsDropsUnrequestedColumns(t *testing.T) {
 	}
 }
 
-// TestNarrowColumnsKeepsAColumnFedByEitherField covers the calendar Date and
+// TestNarrowColumnsKeepsAColumnFedByEitherField covers the calendar When and
 // Company columns, which each read one field and fall back to another.
 func TestNarrowColumnsKeepsAColumnFedByEitherField(t *testing.T) {
 	columns := []string{"ID", "Company"}

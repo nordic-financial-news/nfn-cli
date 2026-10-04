@@ -42,7 +42,7 @@ func planLimitedRenderers() map[string]renderFn {
 			return renderArticles(f, []api.Article{{ID: "a1", Title: "An article"}}, nil, pl, listOpts{})
 		},
 		"calendar events": func(f *output.Formatter, pl *bool) error {
-			return renderCalendarEvents(f, []api.CalendarEvent{{ID: "c1", Title: "An event"}}, nil, pl)
+			return renderCalendarEvents(f, []api.CalendarEvent{{ID: "c1", Title: "An event"}}, nil, pl, false)
 		},
 		"companies": func(f *output.Formatter, pl *bool) error {
 			return renderCompanies(f, []api.Company{{ID: "co1", Name: "A company"}}, nil, pl, listOpts{})
