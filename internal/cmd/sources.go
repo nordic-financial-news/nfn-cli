@@ -11,7 +11,7 @@ import (
 
 var sourcesCmd = &cobra.Command{
 	Use:   "sources",
-	Short: "Manage news sources",
+	Short: "Browse news sources",
 }
 
 var sourcesListCmd = &cobra.Command{

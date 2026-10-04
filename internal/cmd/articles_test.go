@@ -5,33 +5,6 @@ import (
 	"testing"
 )
 
-func TestTruncate(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		s    string
-		max  int
-		want string
-	}{
-		{name: "under limit", s: "hello", max: 10, want: "hello"},
-		{name: "exact limit", s: "hello", max: 5, want: "hello"},
-		{name: "over limit", s: "hello world", max: 8, want: "hello..."},
-		{name: "empty string", s: "", max: 5, want: ""},
-		{name: "just at boundary", s: "abcdef", max: 6, want: "abcdef"},
-		{name: "one over", s: "abcdefg", max: 6, want: "abc..."},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := truncate(tt.s, tt.max)
-			if got != tt.want {
-				t.Errorf("truncate(%q, %d) = %q, want %q", tt.s, tt.max, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestBuildArticleParams(t *testing.T) {
 	t.Parallel()
 

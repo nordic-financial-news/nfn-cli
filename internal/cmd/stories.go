@@ -12,7 +12,7 @@ import (
 
 var storiesCmd = &cobra.Command{
 	Use:   "stories",
-	Short: "Manage stories",
+	Short: "Browse stories",
 }
 
 var storiesListCmd = &cobra.Command{
@@ -190,17 +190,18 @@ func renderStories(f *output.Formatter, stories []api.Story, pagination *api.Pag
 	}
 	rows := make([][]string, len(stories))
 	for i, s := range stories {
-		rows[i] = []string{s.ID, truncate(s.Title, 60), s.Country, fmt.Sprintf("%d", s.ArticleCount), s.PublishedAt}
+		rows[i] = []string{s.ID, s.Title, s.Country, fmt.Sprintf("%d", s.ArticleCount), listTime(s.PublishedAt)}
 		if showDistance {
 			rows[i] = append(rows[i], formatDistance(s.Distance))
 		}
 	}
 	colFields := [][]string{{"id"}, {"title"}, {"country"}, {"article_count"}, {"published_at"}}
 	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
-	f.Render(columns, rows)
+	f.RenderFit(columns, rows, output.Layout{Flex: "Title", Drop: []string{"Country", "Articles"}})
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
+	listFooter{noun: [2]string{"story", "stories"}, getCmd: "nfn stories get", pagination: pagination}.print(f, len(stories))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}

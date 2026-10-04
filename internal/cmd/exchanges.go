@@ -12,7 +12,7 @@ import (
 
 var exchangesCmd = &cobra.Command{
 	Use:   "exchanges",
-	Short: "Manage exchanges",
+	Short: "Browse exchanges",
 }
 
 var exchangesListCmd = &cobra.Command{

@@ -12,7 +12,7 @@ import (
 
 var articlesCmd = &cobra.Command{
 	Use:   "articles",
-	Short: "Manage articles",
+	Short: "Browse articles",
 }
 
 var articlesListCmd = &cobra.Command{
@@ -227,29 +227,22 @@ func renderArticles(f *output.Formatter, articles []api.Article, pagination *api
 		if a.Source != nil {
 			source = a.Source.Name
 		}
-		rows[i] = []string{a.ID, truncate(a.Title, 60), a.Country, source, a.PublishedAt}
+		rows[i] = []string{a.ID, a.Title, a.Country, source, listTime(a.PublishedAt)}
 		if showDistance {
 			rows[i] = append(rows[i], formatDistance(a.Distance))
 		}
 	}
 	colFields := [][]string{{"id"}, {"title"}, {"country"}, {"source"}, {"published_at"}}
 	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
-	f.Render(columns, rows)
+	f.RenderFit(columns, rows, output.Layout{Flex: "Title", Drop: []string{"Country", "Source"}})
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
+	listFooter{noun: [2]string{"article", "articles"}, getCmd: "nfn articles get", pagination: pagination}.print(f, len(articles))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
 	return nil
-}
-
-func truncate(s string, max int) string {
-	runes := []rune(s)
-	if len(runes) <= max {
-		return s
-	}
-	return string(runes[:max-3]) + "..."
 }
 
 func init() {

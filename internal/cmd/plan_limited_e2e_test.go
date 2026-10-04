@@ -52,6 +52,9 @@ func runListCommand(t *testing.T, cmd *cobra.Command, handler http.HandlerFunc, 
 // arguments, such as a detail route or a nested company route.
 func runCommandWithArgs(t *testing.T, cmd *cobra.Command, handler http.HandlerFunc, format string, cmdArgs []string, args ...string) string {
 	t.Helper()
+	// Tables fit $COLUMNS when not writing to a terminal, so pin it rather than
+	// inherit the developer's shell.
+	t.Setenv("COLUMNS", "120")
 
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)

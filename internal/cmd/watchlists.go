@@ -11,7 +11,7 @@ import (
 
 var watchlistsCmd = &cobra.Command{
 	Use:   "watchlists",
-	Short: "Manage watchlists",
+	Short: "Browse watchlists",
 }
 
 var watchlistsListCmd = &cobra.Command{

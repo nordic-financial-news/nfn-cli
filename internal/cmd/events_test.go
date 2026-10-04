@@ -186,28 +186,6 @@ func TestCompanyEventsRouteOffersAcceptedFilters(t *testing.T) {
 	}
 }
 
-func TestEventReportedDate(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		event api.Event
-		want  string
-	}{
-		{name: "trims a timestamp to its date", event: api.Event{FirstReportedAt: "2026-10-22T05:00:00.000Z"}, want: "2026-10-22"},
-		{name: "short string returned as-is without panic", event: api.Event{FirstReportedAt: "2026"}, want: "2026"},
-		{name: "tombstone carries no timestamp", event: api.Event{Status: "merged"}, want: ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := eventReportedDate(tt.event); got != tt.want {
-				t.Errorf("eventReportedDate() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 // A tombstone omits article_count rather than reporting zero, so the column has
 // to stay blank instead of claiming the event has no articles.
 func TestEventArticleCount(t *testing.T) {
@@ -465,6 +443,120 @@ func TestEventsList_StatusColumnOnlyForTombstones(t *testing.T) {
 			t.Errorf("output = %q, want the merged status", out)
 		}
 	})
+}
+
+// The tier marker and article count earn a column only when they vary; a page
+// of one tier names it once in the footer instead.
+func TestEventsList_ColumnsThatVary(t *testing.T) {
+	mixed := `{"events":[` +
+		`{"id":"evt1","title":"Saab lands order","status":"active","significance":"notable","article_count":4,` +
+		`"first_reported_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:00:00Z"},` +
+		`{"id":"evt2","title":"Why Saab is cheap","status":"active","significance":"commentary","article_count":1,` +
+		`"first_reported_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:00:00Z"}],` +
+		`"pagination":{"count":2,"next_cursor":"cur123"}}`
+	notableOnly := `{"events":[` +
+		`{"id":"evt1","title":"Saab lands order","status":"active","significance":"notable","article_count":1,` +
+		`"first_reported_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:00:00Z"}],` +
+		`"pagination":{"count":1}}`
+
+	t.Run("mixed tiers get a marker column and a legend", func(t *testing.T) {
+		out := runListCommand(t, eventsListCmd, fixedBody(mixed), "table")
+		for _, want := range []string{"SIG", "●", "ARTICLES", "● notable, ○ routine, · commentary", "nfn events get <id>", "--cursor cur123"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q\n%s", want, out)
+			}
+		}
+	})
+
+	t.Run("one tier is named once and constant columns are left out", func(t *testing.T) {
+		out := runListCommand(t, eventsListCmd, fixedBody(notableOnly), "table")
+		for _, unwanted := range []string{"SIG", "ARTICLES", "cursor"} {
+			if strings.Contains(out, unwanted) {
+				t.Errorf("output contains %q, want it left out\n%s", unwanted, out)
+			}
+		}
+		if !strings.Contains(out, "1 event (all notable)") {
+			t.Errorf("output = %q, want the footer to name the tier", out)
+		}
+		// The ID column survives every layout: it is what 'nfn events get' takes.
+		if !strings.Contains(out, "evt1") {
+			t.Errorf("output = %q, want the event ID", out)
+		}
+	})
+
+	// A tombstone has no tier, so "all notable" would misdescribe the page.
+	t.Run("a tombstone on the page withholds the all-tier note", func(t *testing.T) {
+		body := `{"events":[` +
+			`{"id":"evt1","title":"Saab lands order","status":"active","significance":"notable","article_count":1,` +
+			`"first_reported_at":"2026-08-01T00:00:00Z","updated_at":"2026-08-01T00:00:00Z"},` +
+			`{"id":"evt2","status":"merged","merged_into":"evt1","updated_at":"2026-08-02T00:00:00Z"}],` +
+			`"pagination":{"count":2}}`
+		out := runListCommand(t, eventsListCmd, fixedBody(body), "table", "--updated-after", "2026-08-01T00:00:00Z")
+		if strings.Contains(out, "all notable") {
+			t.Errorf("output = %q, want no all-tier note beside a tombstone", out)
+		}
+	})
+
+	// A column the caller named in --fields is shown even when it is constant,
+	// rather than being reported as having no column.
+	t.Run("a requested field keeps its column", func(t *testing.T) {
+		out := runListCommand(t, eventsListCmd, fixedBody(notableOnly), "table", "--fields", "significance,article_count")
+		for _, want := range []string{"SIG", "ARTICLES"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "no table column") {
+			t.Errorf("output = %q, want no no-column note", out)
+		}
+	})
+
+	t.Run("an empty page says so instead of drawing a bare header", func(t *testing.T) {
+		out := runListCommand(t, eventsListCmd, fixedBody(`{"events":[],"pagination":{"count":0}}`), "table")
+		if strings.Contains(out, "TITLE") || !strings.Contains(out, "No events match") {
+			t.Errorf("output = %q, want only the no-match line", out)
+		}
+	})
+}
+
+func TestEventsGet_Detail(t *testing.T) {
+	body := `{"event":{"id":"evt1","title":"Volvo Q3","status":"closed","significance":"notable","article_count":2,` +
+		`"first_reported_at":"2026-08-01T06:00:00Z","last_article_at":"2026-08-01T09:00:00Z","updated_at":"2026-08-02T00:00:00Z",` +
+		`"article_ids":["art1","art2"],"primary_disclosure_article_id":"art1"}}`
+
+	out := runCommandWithArgs(t, eventsGetCmd, fixedBody(body), "table", []string{"evt1"})
+
+	if strings.Contains(out, "closed") {
+		t.Errorf("output = %q, want no Status row on a live event", out)
+	}
+	if strings.Contains(out, "2026-08-01T06:00:00Z") {
+		t.Errorf("output = %q, want timestamps rendered for reading", out)
+	}
+	if strings.Contains(out, "art1, art2") {
+		t.Errorf("output = %q, want one article ID per line", out)
+	}
+	for _, want := range []string{"nfn articles get art1", "nfn events list --related-to evt1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output = %q, want the next step %q", out, want)
+		}
+	}
+}
+
+// A commentary event points back at what it covers rather than inviting
+// commentary on the commentary.
+func TestEventNextSteps(t *testing.T) {
+	t.Parallel()
+
+	steps := eventNextSteps(&api.Event{ID: "evt9", Significance: "commentary", RelatedTo: "evt1", ArticleIDs: []string{"art7"}})
+	got := strings.Join(steps, "\n")
+	for _, want := range []string{"nfn articles get art7", "nfn events get evt1"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("steps = %q, want %q", got, want)
+		}
+	}
+	if strings.Contains(got, "--related-to") {
+		t.Errorf("steps = %q, want no --related-to hint on commentary", got)
+	}
 }
 
 // A tombstone must not be rendered as an event whose content went missing.

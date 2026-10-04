@@ -173,7 +173,7 @@ func TestEventCompany(t *testing.T) {
 		{
 			name:  "prefers inline company name",
 			event: api.CalendarEvent{CompanyID: "cmpny1234567", Company: &api.CalendarCompany{ID: "cmpny1234567", Name: "Telefonaktiebolaget LM Ericsson", Ticker: "ERIC-B"}},
-			want:  "Telefonaktiebolaget LM Eric...",
+			want:  "Telefonaktiebolaget LM Ericss…",
 		},
 		{
 			name:  "falls back to company_id when no inline company",

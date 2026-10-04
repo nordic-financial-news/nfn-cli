@@ -12,7 +12,7 @@ import (
 
 var companiesCmd = &cobra.Command{
 	Use:   "companies",
-	Short: "Manage companies",
+	Short: "Browse companies",
 }
 
 var companiesListCmd = &cobra.Command{
@@ -71,7 +71,7 @@ var companiesGetCmd = &cobra.Command{
 
 		company, _, err := client.GetCompany(cmd.Context(), args[0])
 		if err != nil {
-			return err
+			return companyNotFoundError(err, args[0])
 		}
 
 		if f.Format() == "json" {
@@ -235,14 +235,14 @@ var companiesArticlesCmd = &cobra.Command{
 		if all {
 			articles, resp, err := client.ListAllCompanyArticles(cmd.Context(), args[0], params)
 			if err != nil {
-				return err
+				return companyNotFoundError(err, args[0])
 			}
 			return renderArticles(f, articles, nil, planLimitedFrom(resp), "nfn companies articles")
 		}
 
 		articles, pagination, resp, err := client.ListCompanyArticles(cmd.Context(), args[0], params)
 		if err != nil {
-			return err
+			return companyNotFoundError(err, args[0])
 		}
 		return renderArticles(f, articles, pagination, planLimitedFrom(resp), "nfn companies articles")
 	},
@@ -267,14 +267,14 @@ var companiesStoriesCmd = &cobra.Command{
 		if all {
 			stories, resp, err := client.ListAllCompanyStories(cmd.Context(), args[0], params)
 			if err != nil {
-				return err
+				return companyNotFoundError(err, args[0])
 			}
 			return renderStories(f, stories, nil, planLimitedFrom(resp), "nfn companies stories")
 		}
 
 		stories, pagination, resp, err := client.ListCompanyStories(cmd.Context(), args[0], params)
 		if err != nil {
-			return err
+			return companyNotFoundError(err, args[0])
 		}
 		return renderStories(f, stories, pagination, planLimitedFrom(resp), "nfn companies stories")
 	},
@@ -310,14 +310,14 @@ company's events by meaning with --semantic.`,
 		if all {
 			events, resp, err := client.ListAllCompanyEvents(cmd.Context(), args[0], params)
 			if err != nil {
-				return err
+				return eventTypeError(companyNotFoundError(err, args[0]))
 			}
 			return renderEvents(f, events, nil, planLimitedFrom(resp), truncatedFrom(resp), "nfn companies events")
 		}
 
 		events, pagination, resp, err := client.ListCompanyEvents(cmd.Context(), args[0], params)
 		if err != nil {
-			return err
+			return eventTypeError(companyNotFoundError(err, args[0]))
 		}
 		return renderEvents(f, events, pagination, planLimitedFrom(resp), truncatedFrom(resp), "nfn companies events")
 	},

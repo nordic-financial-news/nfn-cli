@@ -20,8 +20,9 @@ nfn articles list --limit 3
 # Those last two are one development, reported twice. Events collapse it:
 nfn events get wx5ay6jca6h6
 # Title         Landsvirkjun CEO Hörður Arnarson to Leave, Interim CEO From Nov 1
-# Significance  notable
 # Type          CEO Departure (ceo-departure)
+# Significance  notable
+# …
 # Articles      2
 ```
 
@@ -151,6 +152,8 @@ Use `nfn <command> --help` for all available flags.
 - **Interactive terminal:** table format.
 - **Piped or scripted:** JSON format.
 - Override either with `--format table` or `--format json`.
+
+Tables fit the terminal: the title column takes the spare width and is cut with `…`, and on a narrow terminal the least useful columns drop out first. The ID column is never cut, since every `get` command takes it. Piped tables follow `$COLUMNS`, falling back to 120. Times are shown in your local zone, as short as they can be (`09:42` today, `2 Oct 17:10` this year). JSON always carries the full ISO 8601 values. A footer under each list gives the count, the command that opens a row and, when there is another page, the `--cursor` to reach it.
 
 JSON responses use an envelope, `{ok, data, summary, breadcrumbs}`. The payload is always at `.data`, and errors are always `{ok: false, error}`.
 

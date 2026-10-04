@@ -11,7 +11,7 @@ import (
 
 var calendarCmd = &cobra.Command{
 	Use:   "calendar",
-	Short: "Manage calendar events",
+	Short: "Browse calendar events",
 }
 
 var calendarListCmd = &cobra.Command{
@@ -193,14 +193,15 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 	columns := []string{"ID", "Date", "Type", "Title", "Company", "Status"}
 	rows := make([][]string, len(events))
 	for i, e := range events {
-		rows[i] = []string{e.ID, eventDate(e), e.EventType, truncate(e.Title, 60), eventCompany(e), e.Status}
+		rows[i] = []string{e.ID, eventDate(e), e.EventType, e.Title, eventCompany(e), e.Status}
 	}
 	colFields := [][]string{{"id"}, {"local_time", "scheduled_at"}, {"event_type"}, {"title"}, {"company", "company_id"}, {"status"}}
 	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
-	f.Render(columns, rows)
+	f.RenderFit(columns, rows, output.Layout{Flex: "Title", Drop: []string{"Status", "Type"}})
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
+	listFooter{noun: [2]string{"calendar event", "calendar events"}, getCmd: "nfn calendar get", pagination: pagination}.print(f, len(events))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -212,7 +213,7 @@ func renderCalendarEvents(f *output.Formatter, events []api.CalendarEvent, pagin
 // issuer is withheld or a narrowing --fields selection dropped the company object.
 func eventCompany(e api.CalendarEvent) string {
 	if e.Company != nil && e.Company.Name != "" {
-		return truncate(e.Company.Name, 30)
+		return output.Ellipsize(e.Company.Name, 30)
 	}
 	return e.CompanyID
 }

@@ -11,7 +11,7 @@ import (
 
 var countriesCmd = &cobra.Command{
 	Use:   "countries",
-	Short: "Manage supported countries",
+	Short: "Browse supported countries",
 }
 
 var countriesListCmd = &cobra.Command{

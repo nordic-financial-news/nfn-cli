@@ -56,7 +56,22 @@ func (f *Formatter) Render(columns []string, rows [][]string) {
 		f.renderRowsAsJSON(columns, rows)
 		return
 	}
-	renderTable(f.writer, columns, rows, f.noColor)
+	renderTable(f.writer, columns, rows, f.noColor, nil)
+}
+
+// RenderFit outputs columnar data like Render, fitting a table to the
+// terminal width as the layout describes. JSON output is unaffected. An empty
+// table is not drawn at all: a header with nothing under it reads as a
+// rendering fault, so the caller says "no matches" in words instead.
+func (f *Formatter) RenderFit(columns []string, rows [][]string, layout Layout) {
+	if f.format == "json" {
+		f.renderRowsAsJSON(columns, rows)
+		return
+	}
+	if len(rows) == 0 {
+		return
+	}
+	renderTable(f.writer, columns, rows, f.noColor, &layout)
 }
 
 // RenderDetail outputs key-value pairs as a table or JSON.

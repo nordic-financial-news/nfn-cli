@@ -11,7 +11,7 @@ import (
 
 var indicesCmd = &cobra.Command{
 	Use:   "indices",
-	Short: "Manage stock indices",
+	Short: "Browse stock indices",
 }
 
 var indicesListCmd = &cobra.Command{

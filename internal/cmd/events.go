@@ -13,8 +13,8 @@ import (
 
 var eventsCmd = &cobra.Command{
 	Use:   "events",
-	Short: "Manage events",
-	Long: `Manage events.
+	Short: "Browse events",
+	Long: `Browse events.
 
 An event groups the articles reporting one real-world development — an earnings
 report, an acquisition, an executive change. This is distinct from 'nfn calendar',
@@ -65,14 +65,14 @@ returning a relevance-ranked page, so it composes with --window, --sort and --al
 		if all {
 			events, resp, err := client.ListAllEvents(cmd.Context(), params)
 			if err != nil {
-				return watchlistFilterError(err, watchlistID)
+				return eventTypeError(watchlistFilterError(err, watchlistID))
 			}
 			return renderEvents(f, events, nil, planLimitedFrom(resp), truncatedFrom(resp))
 		}
 
 		events, pagination, resp, err := client.ListEvents(cmd.Context(), params)
 		if err != nil {
-			return semanticError(watchlistFilterError(err, watchlistID), semantic)
+			return eventTypeError(semanticError(watchlistFilterError(err, watchlistID), semantic))
 		}
 		return renderEvents(f, events, pagination, planLimitedFrom(resp), truncatedFrom(resp))
 	},
@@ -120,7 +120,7 @@ outside your plan's reach returns 403 rather than 404.`,
 			if event.MergedInto != "" {
 				fields = append(fields, output.Field{Key: "Merged Into", Value: event.MergedInto})
 			}
-			fields = append(fields, output.Field{Key: "Updated", Value: event.UpdatedAt})
+			fields = append(fields, output.Field{Key: "Updated", Value: detailTime(event.UpdatedAt)})
 			f.RenderDetail(fields)
 			f.Println(eventTombstoneNote(event))
 			return nil
@@ -134,17 +134,15 @@ outside your plan's reach returns 403 rather than 404.`,
 			}
 		}
 
+		// Rows run from what happened, to who and when, to the IDs that lead
+		// further. Status is left out: on a live event it is active or closed,
+		// which the dates already say (see the tombstone branch above for the
+		// states that matter).
 		fields := []output.Field{
 			{Key: "ID", Value: event.ID},
 			{Key: "Title", Value: event.Title},
-			{Key: "Status", Value: event.Status},
-			{Key: "Significance", Value: event.Significance},
 			{Key: "Type", Value: eventType},
-			{Key: "Summary", Value: event.Summary},
-			{Key: "Articles", Value: strconv.Itoa(event.ArticleCount)},
-			{Key: "First Reported", Value: event.FirstReportedAt},
-			{Key: "Last Article", Value: event.LastArticleAt},
-			{Key: "Updated", Value: event.UpdatedAt},
+			{Key: "Significance", Value: event.Significance},
 		}
 
 		if len(event.Companies) > 0 {
@@ -152,19 +150,27 @@ outside your plan's reach returns 403 rather than 404.`,
 			for i, c := range event.Companies {
 				labels[i] = eventCompanyLabel(c)
 			}
-			fields = append(fields, output.Field{Key: "Companies", Value: strings.Join(labels, ", ")})
+			fields = append(fields, output.Field{Key: "Companies", Value: strings.Join(labels, "\n")})
 		} else if len(event.CompanyIDs) > 0 {
-			fields = append(fields, output.Field{Key: "Company IDs", Value: strings.Join(event.CompanyIDs, ", ")})
+			fields = append(fields, output.Field{Key: "Company IDs", Value: strings.Join(event.CompanyIDs, "\n")})
 		}
 
+		fields = append(fields,
+			output.Field{Key: "First Reported", Value: detailTime(event.FirstReportedAt)},
+			output.Field{Key: "Last Article", Value: detailTime(event.LastArticleAt)},
+			output.Field{Key: "Summary", Value: event.Summary},
+			output.Field{Key: "Articles", Value: strconv.Itoa(event.ArticleCount)},
+		)
+
+		// One ID per line, so each can be copied whole.
 		if len(event.ArticleIDs) > 0 {
-			fields = append(fields, output.Field{Key: "Article IDs", Value: strings.Join(event.ArticleIDs, ", ")})
+			fields = append(fields, output.Field{Key: "Article IDs", Value: strings.Join(event.ArticleIDs, "\n")})
 		}
 		if event.PrimaryDisclosureArticleID != "" {
 			fields = append(fields, output.Field{Key: "Primary Disclosure", Value: event.PrimaryDisclosureArticleID})
 		}
 		if len(event.StoryIDs) > 0 {
-			fields = append(fields, output.Field{Key: "Story IDs", Value: strings.Join(event.StoryIDs, ", ")})
+			fields = append(fields, output.Field{Key: "Story IDs", Value: strings.Join(event.StoryIDs, "\n")})
 		}
 		if event.RelatedTo != "" {
 			fields = append(fields, output.Field{Key: "Comments On", Value: event.RelatedTo})
@@ -175,8 +181,12 @@ outside your plan's reach returns 403 rather than 404.`,
 				fields = append(fields, output.Field{Key: "Divergence", Value: strings.Join(lines, "\n")})
 			}
 		}
+		fields = append(fields, output.Field{Key: "Updated", Value: detailTime(event.UpdatedAt)})
 
 		f.RenderDetail(fields)
+		for _, hint := range eventNextSteps(event) {
+			f.Println(hint)
+		}
 		return nil
 	},
 }
@@ -190,7 +200,7 @@ These hyphenated slugs are a separate vocabulary from the underscored
 --event-type values 'nfn calendar list' takes. Each rejects the other's values,
 and a few spellings overlap while denoting different things.
 
-The table abbreviates each type's definition to keep its width; --format json
+The table cuts each type's definition to the terminal width; --format json
 carries the full text, which is what distinguishes the near neighbours.`,
 	Example: `  nfn event-types
   nfn event-types --fields slug,label
@@ -355,7 +365,38 @@ func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagin
 		}
 	}
 
-	columns := []string{"ID", "Reported", "Type", "Significance", "Title", "Articles"}
+	// A tier marker that never varies says nothing per row, so a page of one
+	// tier names it once in the footer instead. The same goes for the article
+	// count, which is 1 on most fresh events. Either still gets its column when
+	// --fields asks for it by name.
+	want := f.Fields()
+	tiers := map[string]bool{}
+	untiered := false
+	showArticles := want["article_count"]
+	for _, e := range events {
+		if e.Significance != "" {
+			tiers[e.Significance] = true
+		} else {
+			untiered = true
+		}
+		if e.ArticleCount > 1 {
+			showArticles = true
+		}
+	}
+	showTier := len(tiers) > 1 || want["significance"]
+
+	columns := []string{"ID", "Reported"}
+	colFields := [][]string{{"id"}, {"first_reported_at"}}
+	if showTier {
+		columns = append(columns, "Sig")
+		colFields = append(colFields, []string{"significance"})
+	}
+	columns = append(columns, "Type", "Title")
+	colFields = append(colFields, []string{"event_type"}, []string{"title"})
+	if showArticles {
+		columns = append(columns, "Articles")
+		colFields = append(colFields, []string{"article_count"})
+	}
 	if showStatus {
 		columns = append(columns, "Status")
 	}
@@ -368,20 +409,42 @@ func renderEvents(f *output.Formatter, events []api.Event, pagination *api.Pagin
 		if e.EventType != nil {
 			eventType = e.EventType.Slug
 		}
-		rows[i] = []string{e.ID, eventReportedDate(e), eventType, e.Significance, truncate(e.Title, 60), eventArticleCount(e)}
+		row := []string{e.ID, listTime(e.FirstReportedAt)}
+		if showTier {
+			row = append(row, tierMarker(e.Significance))
+		}
+		row = append(row, eventType, e.Title)
+		if showArticles {
+			row = append(row, eventArticleCount(e))
+		}
 		if showStatus {
-			rows[i] = append(rows[i], e.Status)
+			row = append(row, e.Status)
 		}
 		if showDistance {
-			rows[i] = append(rows[i], formatDistance(e.Distance))
+			row = append(row, formatDistance(e.Distance))
 		}
+		rows[i] = row
 	}
-	colFields := [][]string{{"id"}, {"first_reported_at"}, {"event_type"}, {"significance"}, {"title"}, {"article_count"}}
 	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
-	f.Render(columns, rows)
+	f.RenderFit(columns, rows, output.Layout{Flex: "Title", Drop: []string{"Articles", "Type", "Sig"}})
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
 	}
+	footer := listFooter{
+		noun:       [2]string{"event", "events"},
+		getCmd:     "nfn events get",
+		pagination: pagination,
+		emptyHint:  "Try a wider --window, or fewer filters.",
+	}
+	switch {
+	case showTier:
+		footer.notes = append(footer.notes, tierLegend)
+	case len(tiers) == 1 && !untiered:
+		for tier := range tiers {
+			footer.notes = append(footer.notes, "all "+tier)
+		}
+	}
+	footer.print(f, len(events))
 	if isPlanLimited(planLimited) {
 		f.Println(planLimitedNote)
 	}
@@ -404,16 +467,25 @@ func renderEventTypes(f *output.Formatter, eventTypes []api.EventTypeDetail, pag
 		return f.RenderEnvelope(result, fmt.Sprintf("%d event types", len(eventTypes)), breadcrumbsFor("nfn event-types"))
 	}
 
-	columns := []string{"Slug", "Label", "Category", "Summary"}
+	// Slug leads because --event-type takes it. The API groups types by
+	// category, so Category next reads as sections. Near neighbours share
+	// their summaries' opening words, so Summary gets the spare width.
+	columns := []string{"Slug", "Category", "Label", "Summary"}
 	rows := make([][]string, len(eventTypes))
 	for i, t := range eventTypes {
-		rows[i] = []string{t.Slug, t.Label, t.Category, truncate(t.Summary, 36)}
+		rows[i] = []string{t.Slug, t.Category, t.Label, t.Summary}
 	}
-	colFields := [][]string{{"slug"}, {"label"}, {"category"}, {"summary"}}
+	colFields := [][]string{{"slug"}, {"category"}, {"label"}, {"summary"}}
 	columns, rows = narrowColumns(f.Fields(), columns, rows, colFields)
-	f.Render(columns, rows)
+	f.RenderFit(columns, rows, output.Layout{Flex: "Summary", Drop: []string{"Label", "Category"}})
 	if note := noColumnNote(fieldsWithoutColumn(f.Fields(), colFields)); note != "" {
 		f.Println(note)
+	}
+	switch {
+	case len(eventTypes) == 0:
+		f.Println("No event types returned.")
+	case f.Fields() == nil || f.Fields()["summary"]:
+		f.Println("Full definitions: nfn event-types --format json")
 	}
 	return nil
 }
@@ -434,15 +506,23 @@ func truncatedFrom(resp *api.Response) *bool {
 	return resp.Truncated
 }
 
-// eventReportedDate returns the date (YYYY-MM-DD) an event was first reported.
-// A tombstone carries no timestamp and renders blank.
-func eventReportedDate(e api.Event) string {
-	s := e.FirstReportedAt
-	if len(s) < 10 {
-		return s
+// tierMarker is the one-cell significance marker in the events table, heavier
+// for the tiers that matter more. tierLegend decodes it under the table.
+func tierMarker(significance string) string {
+	switch significance {
+	case "notable":
+		return "●"
+	case "routine":
+		return "○"
+	case "commentary":
+		return "·"
 	}
-	return s[:10]
+	// A tier this build does not know is shown by name rather than as a blank
+	// the legend cannot explain.
+	return significance
 }
+
+const tierLegend = "● notable, ○ routine, · commentary"
 
 // eventArticleCount renders the member-article count, left blank on a tombstone
 // where the API omits the field rather than reporting zero.
@@ -451,6 +531,37 @@ func eventArticleCount(e api.Event) string {
 		return ""
 	}
 	return strconv.Itoa(e.ArticleCount)
+}
+
+// eventNextSteps are the follow-up commands printed under an event's detail
+// table: the hops its IDs lead to, which JSON output carries as breadcrumbs.
+func eventNextSteps(e *api.Event) []string {
+	var labels, commands []string
+	switch {
+	case e.PrimaryDisclosureArticleID != "":
+		labels = append(labels, "Read the disclosure:")
+		commands = append(commands, "nfn articles get "+e.PrimaryDisclosureArticleID)
+	case len(e.ArticleIDs) > 0:
+		labels = append(labels, "Read an article:")
+		commands = append(commands, "nfn articles get "+e.ArticleIDs[0])
+	}
+	if e.RelatedTo != "" {
+		labels = append(labels, "The event it covers:")
+		commands = append(commands, "nfn events get "+e.RelatedTo)
+	} else if e.Significance != "commentary" {
+		labels = append(labels, "Commentary on it:")
+		commands = append(commands, "nfn events list --related-to "+e.ID)
+	}
+
+	width := 0
+	for _, l := range labels {
+		width = max(width, len(l))
+	}
+	steps := make([]string, len(labels))
+	for i := range labels {
+		steps[i] = fmt.Sprintf("%-*s %s", width, labels[i], commands[i])
+	}
+	return steps
 }
 
 // eventSummaryLine is the envelope summary for a single event, naming the
