@@ -1,13 +1,15 @@
 ---
 name: nfn-cli
 description: |
-  Use the nfn CLI to query Nordic financial news — articles, stories, companies, exchanges,
+  Use the nfn CLI to query Nordic financial news — articles, stories, events, companies, exchanges,
   indices, watchlists, calendar events, and categories across Sweden, Denmark, Norway, Finland, and Iceland.
   ALWAYS use this skill when the user wants to: find news about a Nordic company (Ericsson,
   Volvo, Novo Nordisk, Northvolt, Maersk, etc.), look up a company by ticker or ID (VOLV-B,
   ERIC-B, NOVO-B, NDA-SE, MAERSK-B), list companies on an exchange (XSTO, XCSE, XHEL, XOSL), see index
   constituents (OMXS30, OMXC25, OMXH25, OBX), search for financial news by topic, filter
-  articles by country or category, manage watchlists, see upcoming financial calendar events
+  articles by country or category, manage watchlists, see what happened as grouped events
+  rather than one row per article (earnings reports, acquisitions, executive changes),
+  see upcoming financial calendar events
   (earnings reports, dividends, AGMs), or script/automate news queries with
   JSON output. Also use when troubleshooting nfn CLI errors (401, auth issues, rate limits)
   or when the user mentions nordicfinancialnews.com. Even if the user doesn't say "nfn"
@@ -24,6 +26,8 @@ triggers:
   - nfn indices
   - nfn watchlists
   - nfn calendar
+  - nfn events
+  - nfn event-types
   - nfn categories
   - nfn countries
   - nfn sources
@@ -43,6 +47,8 @@ triggers:
   - latest articles
   - latest stories
   - market news
+  - what happened
+  - recent developments
   # Questions
   - what's the news on
   - any news about
@@ -73,7 +79,7 @@ argument-hint: "[command] [args...]"
 
 # /nfn - Nordic Financial News CLI
 
-Query Nordic financial news articles, stories, companies, stock exchanges, indices, watchlists, and categories from the terminal.
+Query Nordic financial news articles, stories, events, companies, stock exchanges, indices, watchlists, and categories from the terminal.
 
 ## Agent Invariants
 
@@ -118,18 +124,33 @@ Query Nordic financial news articles, stories, companies, stock exchanges, indic
 
 15. **Check `plan_limited` before treating a result as complete** — list responses include `data.plan_limited: true` when the API key's plan hid records from the result. A short result is not proof that few records exist. When it's true, say so rather than reporting the visible count as the full picture; the fix is a plan upgrade, not a different query or a larger `--limit`. The key is omitted entirely when no restriction applied, so test for `true` (`.data.plan_limited == true`), not merely for presence. In table mode this surfaces as a note under the table.
 
-13. **Use `--semantic` when the request is thematic, not lexical** — `nfn articles list`, `nfn stories list`, and `nfn companies list` accept `--semantic`, which matches `--q` by meaning (embedding similarity) instead of keywords. Reach for it when the user describes a theme rather than a term: "defence contract wins and capacity expansion" finds relevant results that share no words with the query. Stick with plain `--q` when they gave you a name, ticker, or exact phrase — lexical search is better at those and costs nothing extra.
+16. **Events group coverage; calendar events are scheduled dates — and their `--event-type` vocabularies are incompatible** — `nfn events list` returns *events*: one real-world development (an earnings report, an acquisition, an executive change) with the articles reporting it grouped under it. `nfn calendar list` returns *scheduled future dates* for one issuer. They answer different questions: "what happened" versus "what is coming up". Use events to collapse a pile of near-duplicate articles about one development into a single row, and to reach the whole story from any single article (`event_id` on `nfn articles get`) or story (`event_id` on `nfn stories get`).
+
+    Their `--event-type` filters take **different, mutually rejected vocabularies**: events takes hyphenated Events-taxonomy slugs (`earnings-report`) from `nfn event-types`; calendar takes underscored types (`earnings_report`). Passing one to the other fails with a `400`. A few spellings overlap (e.g. `delisting`) while denoting different things, so copying a value across the two commands can quietly change what you asked for instead of erroring. Run `nfn event-types` to get the slug for `nfn events list`.
+
+17. **The unfiltered events feed includes commentary and routine filings** — every event carries a `significance` tier: `notable` (material, front-page-worthy), `routine` (scheduled disclosures and filings), or `commentary` (opinion and analysis). `nfn events list` sends no default tier, mirroring the API, so what comes back mixes all three and opinion pieces sit alongside material news. When the user asks what is happening or what matters, pass `--significance notable`. Reach for `--sort significance` only to see all three tiers grouped in one pass — for a plain importance filter `--significance notable` with the default sort is better, since it returns an identical first page without the large ties inside each tier.
+
+18. **Three different things make an events result incomplete** — `plan_limited` (invariant 15) means your plan hid records. `data.truncated: true`, which **only** the events feed sends and only under `--semantic`, means the search exhausted its match horizon: further matching events exist and **no cursor reaches them**, since a semantic page has no `next_cursor`. Never report a truncated page as the full set of matches; narrow the query or add hard filters rather than raising `--limit`. Both surface as a note under the table, and both are absent when nothing applied, so test for `true`. Third, `--sort significance` is a **best-effort snapshot**: an event that changes tier mid-walk can be skipped entirely, so an `--all` walk under that sort is not guaranteed complete and no client-side de-duplication can repair it. When completeness matters, walk the default sort and pass `--significance notable` instead.
+
+    An event's `status` is `active`, `closed`, `merged` or `removed`. The first two are both **live**: `closed` only means the coverage window lapsed, and it can reopen — it is the normal state for anything but the last few days, so do not read it as deleted or as a reason to re-query. Table output shows a Status column only when a tombstone is present, since `active`/`closed` is uniform within a result set and already implied by the dates; read `status` from `--format json` when you need it per row.
+
+    Events also reach terminal states that articles and stories do not. Two events found to describe the same development **merge**; an event with no live coverage left, or one found to be incorrect, is **removed**. Both are permanent. Such an event drops out of the normal feed, but its id keeps resolving: `nfn events get <id>` answers with a **tombstone** carrying only `id`, `status`, `merged_into` and `updated_at` — no title, summary, counts or id arrays. The CLI renders exactly those four fields plus a note pointing at the surviving event, so do not read the missing fields as a failed fetch. An `event_id` you cached can become a tombstone at any time.
+
+    Tombstones appear in a list **only** under `--updated-after`, which is therefore the only way to learn that an event you already hold is gone. Poll with your last sync timestamp and `--all`. Two cautions on that walk. Tombstones respect event-grain filters (`--ticker`, `--event-type`, `--significance`, ...) but *not* article-grain ones (`--country`, `--category`, `--sources`, `--source-type`, `--content-type`), having no live articles left to filter by — poll without those for full-fidelity coverage. And the events cursor walk is at-least-once rather than exactly-once, because a merge moves the surviving event earlier in the default order (and an `--updated-after` walk, ordered by update time ascending, re-emits for the same reason). `--all` de-duplicates by `id` for you, **keeping the copy from the latest page** — which is the current one, since the repeat is caused by the record changing. If you follow `--cursor` by hand, de-duplicate the same way round: keep the last copy, not the first. Keeping the first silently discards the tombstone of an event that merges mid-walk, leaving your mirror holding an event the API no longer serves — the exact failure the sync exists to prevent.
+
+19. **Use `--semantic` when the request is thematic, not lexical** — `nfn articles list`, `nfn stories list`, `nfn companies list` and `nfn events list` accept `--semantic`, which matches `--q` by meaning (embedding similarity) instead of keywords. Reach for it when the user describes a theme rather than a term: "defence contract wins and capacity expansion" finds relevant results that share no words with the query. Stick with plain `--q` when they gave you a name, ticker, or exact phrase — lexical search is better at those and costs nothing extra.
 
     - `--q` is required and must be 2-200 characters.
     - Every other filter still applies as a hard filter, so `--semantic` composes with `--country`, `--market`, `--sector`, date ranges and the rest.
     - Results are a **single page ranked by closeness**. There is no cursor, so `--all`, `--cursor`, and `--updated-after` are rejected; `--sort` is rejected too, because semantic mode defines its own ranking. Use `--limit` to size the page.
-    - **A short page does not mean the archive is thin.** A server-side relevance floor drops weak matches, so a semantic page is frequently shorter than `--limit` and can come back empty — a 25-limit query returning 1 row is normal and means "only one thing cleared the bar", not "coverage is missing". Do not report a small semantic result as evidence that little was published; re-run without `--semantic`, or widen the query, before drawing that conclusion. This is separate from `plan_limited` (invariant 12): the floor shortens a page on any plan, so check `plan_limited` to tell the two causes apart.
+    - **A short page does not mean the archive is thin.** A server-side relevance floor drops weak matches, so a semantic page is frequently shorter than `--limit` and can come back empty — a 25-limit query returning 1 row is normal and means "only one thing cleared the bar", not "coverage is missing". Do not report a small semantic result as evidence that little was published; re-run without `--semantic`, or widen the query, before drawing that conclusion. This is separate from `plan_limited` (invariant 15): the floor shortens a page on any plan, so check `plan_limited` to tell the two causes apart.
     - Each result carries `distance`: the raw cosine distance to the query, lower being closer. Articles and stories are ordered by distance blended with a small recency bonus, so equally close matches come out newest-first, while the reported `distance` stays raw. Companies blend distance with a small coverage bonus, so a well-covered company outranks an equally close but barely-covered one. In table mode this appears as a `Distance` column.
-    - **What each type matches on:** articles match their summarized text; stories match title, summary and key entities only — the narrative content is *not* part of the match, so a detail that appears only in the body won't be found; companies match name, aliases, country, sector, industry and description.
+    - **What each type matches on:** articles match their summarized text; stories match title, summary and key entities only — the narrative content is *not* part of the match, so a detail that appears only in the body won't be found; companies match name, aliases, country, sector, industry and description; events match their *member articles'* title and summary, and **not** the event's own title or summary, so `--semantic` on events is not a strict improvement on `--q` — an event with an on-topic title whose coverage is oblique matches `--q` and not `--semantic`.
     - **Keep geography out of `--q` on companies.** A place name in the query matches company *names* containing it ("Nordic ...", "Swedish ...") ahead of companies that actually do the thing. Put it in `--market`, `--domicile` or `--country`, which apply as hard filters before the match.
-    - Semantic requests come from a **separate budget of 120 per hour per API key**, shared across articles, stories, and companies. Don't spray semantic queries where one would do.
+    - Semantic requests come from a **separate budget of 120 per hour per API key**, shared across every resource that accepts `--semantic`. Don't spray semantic queries where one would do.
     - It never silently falls back to keyword matching: if the backend is down the command fails rather than returning lexical results, so a success is always a genuine semantic result.
-    - On stories, a plan's story cap clamps the size of the semantic result, so a capped plan gets its closest matches rather than its newest stories. Check `plan_limited` as usual.
+    - On stories, a plan's story cap clamps the size of the semantic result, so a capped plan gets its closest matches rather than its newest stories. Check `plan_limited` as usual. On events the recent-events cap does *not* apply in semantic mode, so `plan_limited` there reports only that source and age restrictions are in force.
+    - On events only, check `data.truncated` as well (invariant 18). **Events' reported `distance` will not look sorted**, and that is correct, not a bug: ranking uses the *mean of an event's two closest* member articles plus a recency bonus, while the `distance` shown is its single closest article's raw value. Do not re-sort by it or treat an out-of-order row as a defect.
 
 ### Output Modes
 
@@ -223,6 +244,27 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Only listed companies | `nfn stories list --listed` |
 | Filter by watchlist | `nfn stories list --watchlist-id <id>` |
 | Get story details | `nfn stories get <id> --format json` |
+| **Events** | |
+| List events | `nfn events list --format json` |
+| Only material events | `nfn events list --significance notable` |
+| See all tiers, grouped | `nfn events list --sort significance` |
+| List the event taxonomy | `nfn event-types` |
+| Filter by event type | `nfn events list --event-type earnings-report,acquisition-announced` |
+| Filter by ticker | `nfn events list --ticker VOLV-B` |
+| Filter by company ID | `nfn events list --company <id>` |
+| Recently active only | `nfn events list --window 7d` |
+| Filter by first-reported range | `nfn events list --first-reported-after 2026-01-01T00:00:00Z` |
+| Filter by last-activity range | `nfn events list --last-article-after 2026-03-01T00:00:00Z` |
+| Search events by text (feed order, paginates) | `nfn events list --q "battery"` |
+| Search events by meaning | `nfn events list --q "defence contract wins" --semantic` |
+| Filter by listing market | `nfn events list --market SE` |
+| Filter by exchange | `nfn events list --exchange XSTO,XCSE` |
+| Only listed companies | `nfn events list --listed` |
+| Filter by watchlist | `nfn events list --watchlist-id <id>` |
+| Include peripheral company roles | `nfn events list --ticker VOLV-B --include-peripheral` |
+| Commentary reacting to an event | `nfn events list --related-to <event-id>` |
+| Incremental sync (includes tombstones) | `nfn events list --updated-after "2026-03-01T00:00:00Z" --all --format json` |
+| Get event details | `nfn events get <id> --format json` |
 | **Calendar** | |
 | List calendar events | `nfn calendar list --format json` |
 | Filter by ticker | `nfn calendar list --ticker VOLV-B` |
@@ -256,6 +298,9 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Company articles, search | `nfn companies articles VOLV-B --q "battery" --sort latest --all` |
 | Company stories | `nfn companies stories VOLV-B --limit 5` |
 | Company stories, filtered | `nfn companies stories VOLV-B --category <category-id> --published-after 2026-01-01` |
+| Company events | `nfn companies events VOLV-B --limit 5` |
+| Company events, material only | `nfn companies events VOLV-B --significance notable` |
+| Company events, recently active | `nfn companies events VOLV-B --window 30d` |
 | **Exchanges** | |
 | List exchanges | `nfn exchanges list --format json` |
 | Filter by country | `nfn exchanges list --country SE` |
@@ -272,6 +317,9 @@ nfn articles list --fields "id,title,published_at"  # Return only specified fiel
 | Limit results | `nfn search "battery" --limit 5` |
 | **Categories** | |
 | List categories | `nfn categories --format json` |
+| **Event types** | |
+| List event types | `nfn event-types --format json` |
+| Filter events by type | `nfn events list --event-type <slug>` |
 | **Countries** | |
 | List countries | `nfn countries list` |
 | Get country details | `nfn countries get SE` |
@@ -319,6 +367,13 @@ Looking for news?
 ├── Want a specific category? → nfn categories (to see IDs)
 │   └── then → nfn articles list --category <category-id>
 ├── Want stories (clustered articles)? → nfn stories list
+├── Want what happened, not every article about it? → nfn events list --significance notable
+│   ├── For one company? → nfn companies events VOLV-B --significance notable
+│   ├── A kind of development? → nfn event-types (to see slugs)
+│   │   └── then → nfn events list --event-type earnings-report
+│   ├── Only recently active? → nfn events list --window 7d
+│   ├── Holding an article or story? → read its event_id, then nfn events get <event-id>
+│   └── What changed since a sync? → nfn events list --updated-after <ts> --all
 ├── Want upcoming events (earnings, dividends, AGMs)? → nfn calendar list --ticker VOLV-B
 ├── Only about listed companies? → nfn articles list --listed
 ├── Only about companies in a watchlist? → nfn watchlists list (to see IDs)
@@ -409,6 +464,75 @@ nfn companies articles VOLV-B --category <category-id> --published-after 2026-01
 nfn companies articles VOLV-B --q "battery" --sort latest --all --format json
 # Drop articles where the company is only a passing mention
 nfn companies articles VOLV-B --primary-only --format json
+```
+
+### Summarise what happened, without reading the same story four times
+
+```bash
+# One row per development instead of one per article. --significance notable drops
+# the commentary and routine filings the unfiltered feed also returns.
+nfn events list --significance notable --window 24h --format json
+
+# The detail view carries the member article IDs, the involved companies with their
+# association tier, and the earliest primary-disclosure article (an exchange feed,
+# wire service, PR platform or government body) — start there, not at a rewrite.
+nfn events get <event-id> --format json
+
+# member_figures_disagree flags a development where sources report different
+# numbers for the same figure. figure_divergence gives the range and the
+# per-article values behind it; quote the primary disclosure, not the spread.
+```
+
+### Go from one article to the whole development
+
+```bash
+# Any article or story carries the event it belongs to
+nfn articles get <article-id> --format json | jq -r '.data.event_id'
+
+# Then pull the event to find the rest of the coverage
+nfn events get <event-id> --format json
+
+# A merged or removed event still resolves, to a tombstone: id, status,
+# merged_into and updated_at only. Follow merged_into to the survivor.
+```
+
+### Track one company's developments
+
+```bash
+# The fourth company member route, alongside articles, stories and calendar events
+nfn companies events VOLV-B --limit 10 --format json
+
+# Material developments in the last month
+nfn companies events VOLV-B --significance notable --window 30d --format json
+
+# The path fixes the company, so --ticker/--company/--listed/--exchange and the
+# other company-selecting filters are rejected here. Use the flat feed for those,
+# and for searching one company's events by meaning:
+nfn events list --company <id> --q "capacity expansion" --semantic --format json
+```
+
+### Keep a local mirror of events in sync
+
+```bash
+# Poll with your last completed sync timestamp. This is the ONLY request that
+# returns merge and removal tombstones, so it is the only way to learn that an
+# event you already hold is gone.
+nfn events list --updated-after "2026-03-01T00:00:00Z" --all --format json
+
+# Omit the article-grain filters (--country, --category, --sources, --source-type,
+# --content-type) while polling: tombstones have no live articles to match them,
+# so those filters silently drop the deletions you are polling for.
+# Advance your stored timestamp only after --all has drained every page.
+```
+
+### Find the right event type slug
+
+```bash
+# --event-type on events takes hyphenated Events-taxonomy slugs, NOT the
+# underscored calendar types — each rejects the other's values with a 400
+nfn event-types --format json
+
+nfn events list --event-type earnings-report,acquisition-announced --format json
 ```
 
 ### Search for news on a topic
