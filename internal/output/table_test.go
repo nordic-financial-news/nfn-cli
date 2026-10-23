@@ -172,3 +172,50 @@ func TestRenderFitSkipsAnEmptyTable(t *testing.T) {
 		t.Errorf("output = %q, want nothing for an empty table", buf.String())
 	}
 }
+
+func TestProse(t *testing.T) {
+	t.Parallel()
+	got := prose("Intro line.\n## Targets\n- Margin 12%\n* Growth 20%\n\n### Outlook\nUnchanged.")
+	want := "Intro line.\n\nTARGETS\n" + Bullet + "Margin 12%\n" + Bullet + "Growth 20%\n\nOUTLOOK\nUnchanged."
+	if got != want {
+		t.Errorf("prose() = %q, want %q", got, want)
+	}
+}
+
+func TestProseEdgeCases(t *testing.T) {
+	t.Parallel()
+	tests := []struct{ name, in, want string }{
+		{"a # without a space is text", "#1 supplier in the Nordics", "#1 supplier in the Nordics"},
+		{"CRLF line endings", "Revenue rose.\r\n## Outlook\r\nUnchanged.\r\n", "Revenue rose.\n\nOUTLOOK\nUnchanged."},
+		{"bold, links and code", "**Revenue** rose, see [the report](https://example.com/q3) and `EBITDA`", "Revenue rose, see the report (https://example.com/q3) and EBITDA"},
+		{"single * and _ are left alone", "5 * 3 and snake_case", "5 * 3 and snake_case"},
+		{"bullet text is cleaned too", "- __Margin__ 12%", Bullet + "Margin 12%"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := prose(tt.in); got != tt.want {
+				t.Errorf("prose(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWrapLinesHangsNumberedItems(t *testing.T) {
+	t.Parallel()
+	got := wrapLines("12. Orders fell 9.5% from a year earlier", 20)
+	for _, line := range strings.Split(got, "\n")[1:] {
+		if !strings.HasPrefix(line, "    ") {
+			t.Errorf("continuation %q not indented under the item text\n%s", line, got)
+		}
+	}
+}
+
+func TestRenderProseWritesNothingAsJSON(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	NewFormatterWithWriter("json", true, &buf).RenderProse("## Heading\nBody")
+	if buf.Len() != 0 {
+		t.Errorf("output = %q, want nothing on a JSON formatter", buf.String())
+	}
+}

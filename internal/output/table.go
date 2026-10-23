@@ -3,6 +3,7 @@ package output
 import (
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -178,18 +179,28 @@ const Bullet = "• "
 // wrapLines soft-wraps each line of a cell on its own, so a value laid out one
 // item per line keeps that layout instead of being reflowed into a paragraph.
 func wrapLines(s string, width int) string {
-	indent := strings.Repeat(" ", text.StringWidthWithoutEscSequences(Bullet))
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
-		item, ok := strings.CutPrefix(line, Bullet)
-		if !ok || width <= len(indent) {
+		marker := listMarker(line)
+		indent := text.StringWidthWithoutEscSequences(marker)
+		if marker == "" || width <= indent {
 			lines[i] = text.WrapSoft(line, width)
 			continue
 		}
-		wrapped := text.WrapSoft(item, width-len(indent))
-		lines[i] = Bullet + strings.ReplaceAll(wrapped, "\n", "\n"+indent)
+		wrapped := text.WrapSoft(line[len(marker):], width-indent)
+		lines[i] = marker + strings.ReplaceAll(wrapped, "\n", "\n"+strings.Repeat(" ", indent))
 	}
 	return strings.Join(lines, "\n")
+}
+
+var numberedItem = regexp.MustCompile(`^\d+\. `)
+
+// listMarker is the Bullet or "1. " that starts a list item, or "".
+func listMarker(line string) string {
+	if strings.HasPrefix(line, Bullet) {
+		return Bullet
+	}
+	return numberedItem.FindString(line)
 }
 
 func indexOf(columns []string, name string) int {
@@ -270,4 +281,50 @@ func renderDetailTableWidth(w io.Writer, fields []Field, noColor bool, width int
 
 	t.SetStyle(tableStyle(noColor))
 	t.Render()
+}
+
+// proseWidth caps a body of text below the terminal width: lines much longer
+// than this are hard to follow back to their start.
+const proseWidth = 100
+
+var (
+	// A heading needs the space after its #s, so "#1 supplier" stays text.
+	mdHeading = regexp.MustCompile(`^#{1,6}(?:\s+|$)`)
+	mdLink    = regexp.MustCompile(`\[([^\]]+)\]\(([^)\s]+)\)`)
+	mdStrong  = regexp.MustCompile(`\*\*(.+?)\*\*|__(.+?)__`)
+	mdCode    = regexp.MustCompile("`([^`]+)`")
+)
+
+// prose turns the markdown a story body is written in into plain lines:
+// heading markers go, with a blank line kept above each heading, "- " or "* "
+// list items take the Bullet wrapLines indents, links keep their URL in
+// brackets, and bold and code markers go. Single * and _ are left alone, as
+// they turn up in plain text too.
+func prose(md string) string {
+	md = strings.ReplaceAll(md, "\r\n", "\n")
+	md = strings.ReplaceAll(md, "\r", "\n")
+	lines := strings.Split(strings.TrimSpace(md), "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case mdHeading.MatchString(trimmed):
+			heading := mdHeading.ReplaceAllString(trimmed, "")
+			if len(out) > 0 && out[len(out)-1] != "" {
+				out = append(out, "")
+			}
+			out = append(out, strings.ToUpper(inlineProse(heading)))
+		case strings.HasPrefix(trimmed, "- "), strings.HasPrefix(trimmed, "* "):
+			out = append(out, Bullet+inlineProse(trimmed[2:]))
+		default:
+			out = append(out, inlineProse(strings.TrimRight(line, " \t")))
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func inlineProse(s string) string {
+	s = mdLink.ReplaceAllString(s, "$1 ($2)")
+	s = mdStrong.ReplaceAllString(s, "$1$2")
+	return mdCode.ReplaceAllString(s, "$1")
 }

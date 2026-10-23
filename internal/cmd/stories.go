@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
@@ -22,7 +23,7 @@ var storiesListCmd = &cobra.Command{
   nfn stories list --country SE,NO --category <category-id>
   nfn stories list --ticker VOLV-B
   nfn stories list --ticker VOLV-B,ERIC-B
-  nfn stories list --company cmpny1234567
+  nfn stories list --company uejazctgchj4
   nfn stories list --exchange XSTO,XCSE --sector Industrials
   nfn stories list --market SE
   nfn stories list --domicile FI
@@ -65,8 +66,8 @@ var storiesListCmd = &cobra.Command{
 var storiesGetCmd = &cobra.Command{
 	Use:   "get <id>",
 	Short: "Get story details",
-	Example: `  nfn stories get abc123
-  nfn stories get abc123 --format json`,
+	Example: `  nfn stories get w668rgglpr4w
+  nfn stories get w668rgglpr4w --format json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
@@ -81,39 +82,62 @@ var storiesGetCmd = &cobra.Command{
 			return f.RenderEnvelope(story, fmt.Sprintf("story: %s", story.Title), breadcrumbsFor("nfn stories get"))
 		}
 
-		category := ""
-		if story.Category != nil {
-			category = story.Category.Name
-		}
-		companies := make([]string, len(story.Companies))
-		for i, c := range story.Companies {
-			if c.TickerSymbol != "" {
-				companies[i] = c.Name + " (" + c.TickerSymbol + ")"
-			} else {
-				companies[i] = c.Name
-			}
-		}
-
-		fields := []output.Field{
-			{Key: "ID", Value: story.ID},
-			{Key: "Title", Value: story.Title},
-			{Key: "Summary", Value: story.Summary},
-			{Key: "Published", Value: story.PublishedAt},
-			{Key: "Country", Value: story.Country},
-			{Key: "Category", Value: category},
-			{Key: "Articles", Value: strings.Join(story.ArticleIDs, ", ")},
-			{Key: "Companies", Value: strings.Join(companies, ", ")},
-		}
-		if story.EventID != "" {
-			fields = append(fields, output.Field{Key: "Event", Value: story.EventID})
-		}
+		f.RenderDetail(storyFields(story))
 		if story.Content != "" {
-			fields = append(fields, output.Field{Key: "Content", Value: story.Content})
+			f.RenderProse(story.Content)
+			f.Println()
 		}
-
-		f.RenderDetail(fields)
+		for _, line := range storyNextSteps(story) {
+			f.Println(line)
+		}
 		return nil
 	},
+}
+
+// storyFields runs from what the story says, to who it is about, to what it
+// was built from. The body is left to the text under the table, where it reads
+// as prose instead of one tall cell.
+func storyFields(s *api.Story) []output.Field {
+	fields := []output.Field{
+		{Key: "ID", Value: s.ID},
+		{Key: "Title", Value: s.Title},
+		{Key: "Summary", Value: s.Summary},
+	}
+	if len(s.Companies) > 0 {
+		fields = append(fields, output.Field{Key: "Companies", Value: handleLines(s.Companies)})
+	}
+	fields = append(fields, output.Field{Key: "Published", Value: detailTime(s.PublishedAt)})
+	if s.Category != nil {
+		fields = append(fields, output.Field{Key: "Category", Value: s.Category.Name})
+	}
+	if s.Country != "" {
+		fields = append(fields, output.Field{Key: "Country", Value: s.Country})
+	}
+	// One ID per line, so each can be copied whole, with the count in the label.
+	if len(s.ArticleIDs) > 0 {
+		fields = append(fields, output.Field{Key: fmt.Sprintf("Articles (%d)", len(s.ArticleIDs)), Value: strings.Join(s.ArticleIDs, "\n")})
+	} else {
+		fields = append(fields, output.Field{Key: "Articles", Value: strconv.Itoa(s.ArticleCount)})
+	}
+	if s.EventID != "" {
+		fields = append(fields, output.Field{Key: "Event", Value: s.EventID})
+	}
+	return fields
+}
+
+func storyNextSteps(s *api.Story) []string {
+	var steps []nextStep
+	if s.EventID != "" {
+		steps = append(steps, nextStep{"The event behind it:", "nfn events get " + s.EventID})
+	}
+	if len(s.ArticleIDs) > 0 {
+		steps = append(steps, nextStep{"Read an article:", "nfn articles get " + s.ArticleIDs[0]})
+	}
+	if len(s.Companies) == 1 {
+		// By ID: a ticker can resolve to more than one company.
+		steps = append(steps, nextStep{"The company:", "nfn companies get " + s.Companies[0].ID})
+	}
+	return formatNextSteps(steps)
 }
 
 func buildStoryParams(cmd *cobra.Command) url.Values {

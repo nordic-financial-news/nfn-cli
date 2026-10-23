@@ -28,7 +28,7 @@ are not human-verified.`,
   nfn articles list --ticker VOLV-B --published-after 2025-01-01
   nfn articles list --ticker VOLV-B,ERIC-B
   nfn articles list --ticker VOLV-B --primary-only
-  nfn articles list --company cmpny1234567
+  nfn articles list --company uejazctgchj4
   nfn articles list --exchange XSTO,XCSE --sector Industrials
   nfn articles list --market SE
   nfn articles list --domicile FI

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -160,5 +161,32 @@ func TestBuildStoryParams(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestStoriesGet_Detail(t *testing.T) {
+	body := `{"story":{"id":"w668rgglpr4w","title":"Merus Power board approves 2027–2030 strategy","summary":"The board approved new targets.",` +
+		`"content":"The plan calls for revenue of EUR 160 million.\n\n## Financial targets\n- EBITDA margin of at least 12%",` +
+		`"published_at":"2026-10-04T07:07:20.000Z","article_count":2,"article_ids":["iwfcowgf08vz","ysytnjcpqn8p"],"country":"FI",` +
+		`"companies":[{"id":"fj0j795s2ru4","name":"Merus Power Oyj","ticker":"MERUS"}],` +
+		`"category":{"id":"2m0aj78adld4","name":"Product & Strategy"},"event_id":"d33h6ob7dbjg"}}`
+
+	out := runCommandWithArgs(t, storiesGetCmd, fixedBody(body), "table", []string{"w668rgglpr4w"})
+
+	for _, want := range []string{
+		"MERUS  Merus Power Oyj", "| iwfcowgf08vz", "| ysytnjcpqn8p",
+		"FINANCIAL TARGETS\n", "• EBITDA margin of at least 12%",
+		"nfn events get d33h6ob7dbjg", "nfn articles get iwfcowgf08vz", "nfn companies get fj0j795s2ru4",
+		"Articles (2)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
+	}
+	// The body is prose under the table, not a cell, and keeps no markdown.
+	for _, unwanted := range []string{"## ", "- EBITDA", "2026-10-04T07:07", "| The plan calls"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("output has %q\n%s", unwanted, out)
+		}
 	}
 }

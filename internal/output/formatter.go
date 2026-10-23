@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // Formatter handles rendering output in different formats.
@@ -126,4 +127,25 @@ func (f *Formatter) Println(a ...interface{}) {
 // Printf prints formatted output to the formatter's writer.
 func (f *Formatter) Printf(format string, a ...interface{}) {
 	_, _ = fmt.Fprintf(f.writer, format, a...)
+}
+
+// RenderProse prints a markdown body under a detail table as wrapped text,
+// where a table cell would fill the screen with one tall column. Headings lose
+// their markers and stand on their own line; list items become bullets that
+// wrap under their own text.
+func (f *Formatter) RenderProse(md string) {
+	// JSON callers carry the body in their payload; plain text here would
+	// corrupt the stream.
+	if f.format == "json" {
+		return
+	}
+	width := min(termWidth(f.writer), proseWidth)
+	f.Println()
+	// WrapSoft pads each line to the full width, which outside a table is
+	// only trailing space.
+	lines := strings.Split(wrapLines(prose(md), width), "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " ")
+	}
+	f.Println(strings.Join(lines, "\n"))
 }
