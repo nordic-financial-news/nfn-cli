@@ -49,6 +49,9 @@ var searchCmd = &cobra.Command{
 
 		// A search response carries one plan_limited flag covering every
 		// section, so the note is printed once below rather than per section.
+		// Each section is ranked by relevance, which a dated list would
+		// otherwise read as a broken date sort.
+		ranked := listOpts{order: "ranked by relevance"}
 		printed := false
 		if len(results.Companies) > 0 {
 			f.Println("Companies:")
@@ -60,7 +63,7 @@ var searchCmd = &cobra.Command{
 		}
 		if len(results.Articles) > 0 {
 			f.Println("Articles:")
-			if err := renderArticles(f, results.Articles, nil, nil, listOpts{}); err != nil {
+			if err := renderArticles(f, results.Articles, nil, nil, ranked); err != nil {
 				return err
 			}
 			f.Println()
@@ -68,7 +71,7 @@ var searchCmd = &cobra.Command{
 		}
 		if len(results.Stories) > 0 {
 			f.Println("Stories:")
-			if err := renderStories(f, results.Stories, nil, nil, listOpts{}); err != nil {
+			if err := renderStories(f, results.Stories, nil, nil, ranked); err != nil {
 				return err
 			}
 			f.Println()
