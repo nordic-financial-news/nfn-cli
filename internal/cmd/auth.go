@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
+	"time"
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
 	"github.com/nordic-financial-news/nfn-cli/internal/config"
@@ -104,7 +106,9 @@ var authStatusCmd = &cobra.Command{
 		if resp.RateLimitInfo != nil {
 			fmt.Printf("Rate limit: %d/%d remaining\n", resp.RateLimitInfo.Remaining, resp.RateLimitInfo.Limit)
 			if !resp.RateLimitInfo.Reset.IsZero() {
-				fmt.Printf("Resets at: %s\n", resp.RateLimitInfo.Reset.Format("15:04:05"))
+				reset := resp.RateLimitInfo.Reset
+				mins := max(1, int(math.Ceil(time.Until(reset).Minutes())))
+				fmt.Printf("Resets at: %s (in %d min)\n", reset.Format("15:04"), mins)
 			}
 		}
 		return nil

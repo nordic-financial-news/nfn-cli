@@ -105,7 +105,7 @@ func (c *Client) doGet(ctx context.Context, path string, params url.Values, resu
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	rateLimitInfo := parseRateLimitHeaders(resp.Header)
+	rateLimitInfo := parseRateLimitHeaders(resp.Header, time.Now())
 	apiResp := &Response{
 		StatusCode:    resp.StatusCode,
 		RateLimitInfo: rateLimitInfo,
@@ -173,7 +173,10 @@ func extractResponseMeta(body []byte) (planLimited, truncated *bool) {
 	return meta.PlanLimited, meta.Truncated
 }
 
-func parseRateLimitHeaders(h http.Header) *RateLimitInfo {
+// parseRateLimitHeaders reads the rate-limit headers. X-RateLimit-Reset counts
+// the seconds until the window resets, not an epoch, so Reset is that far past
+// now.
+func parseRateLimitHeaders(h http.Header, now time.Time) *RateLimitInfo {
 	limit := h.Get("X-Ratelimit-Limit")
 	remaining := h.Get("X-Ratelimit-Remaining")
 	if limit == "" && remaining == "" {
@@ -185,8 +188,8 @@ func parseRateLimitHeaders(h http.Header) *RateLimitInfo {
 	info.Remaining, _ = strconv.Atoi(remaining)
 
 	if reset := h.Get("X-Ratelimit-Reset"); reset != "" {
-		if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
-			info.Reset = time.Unix(ts, 0)
+		if seconds, err := strconv.Atoi(reset); err == nil && seconds >= 0 {
+			info.Reset = now.Add(time.Duration(seconds) * time.Second).Round(time.Second)
 		}
 	}
 

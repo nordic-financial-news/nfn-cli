@@ -370,12 +370,15 @@ func TestGet_Unauthorized(t *testing.T) {
 
 func TestParseRateLimitHeaders(t *testing.T) {
 	t.Parallel()
+	// The reset header counts seconds from now; read as an epoch it lands in 1970.
+	rateLimitNow := time.Date(2026, 10, 4, 13, 22, 0, 0, time.UTC)
 	tests := []struct {
 		name          string
 		headers       map[string]string
 		wantNil       bool
 		wantLimit     int
 		wantRemaining int
+		wantReset     time.Time
 	}{
 		{
 			name:    "no headers",
@@ -387,10 +390,11 @@ func TestParseRateLimitHeaders(t *testing.T) {
 			headers: map[string]string{
 				"X-Ratelimit-Limit":     "100",
 				"X-Ratelimit-Remaining": "42",
-				"X-Ratelimit-Reset":     "1700000000",
+				"X-Ratelimit-Reset":     "2280",
 			},
 			wantLimit:     100,
 			wantRemaining: 42,
+			wantReset:     rateLimitNow.Add(38 * time.Minute),
 		},
 		{
 			name: "partial headers",
@@ -409,7 +413,7 @@ func TestParseRateLimitHeaders(t *testing.T) {
 			for k, v := range tt.headers {
 				h.Set(k, v)
 			}
-			info := parseRateLimitHeaders(h)
+			info := parseRateLimitHeaders(h, rateLimitNow)
 			if tt.wantNil {
 				if info != nil {
 					t.Errorf("expected nil, got %+v", info)
@@ -424,6 +428,9 @@ func TestParseRateLimitHeaders(t *testing.T) {
 			}
 			if info.Remaining != tt.wantRemaining {
 				t.Errorf("Remaining = %d, want %d", info.Remaining, tt.wantRemaining)
+			}
+			if !info.Reset.Equal(tt.wantReset) {
+				t.Errorf("Reset = %v, want %v", info.Reset, tt.wantReset)
 			}
 		})
 	}
