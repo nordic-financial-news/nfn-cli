@@ -112,7 +112,7 @@ Query Nordic financial news articles, stories, events, companies, stock exchange
 
    Available on `articles list`, `stories list`, `companies list`, and `calendar list`.
 
-10. **Exchange codes are MIC codes** — use `XSTO` for Stockholm, `XCSE` for Copenhagen, `XHEL` for Helsinki, `XOSL` for Oslo. Run `nfn exchanges list` if unsure. `--exchange` accepts a comma-separated list of MICs to cover several venues in one call, e.g. `--exchange XSTO,XCSE`. Reach for `--market SE` instead when you want a whole national market rather than named venues. Note that `--exchange` matches only active listings (and, on `nfn indices list`, only active exchanges) — a company whose sole listing on that exchange is delisted will not appear.
+10. **Exchange codes are MIC codes** — use `XSTO` for Stockholm, `XCSE` for Copenhagen, `XHEL` for Helsinki, `XOSL` for Oslo. Run `nfn exchanges list` if unsure. `--exchange` accepts a comma-separated list of MICs to cover several venues in one call, e.g. `--exchange XSTO,XCSE`. Reach for `--market SE` instead when you want a whole national market rather than named venues. Note that `--exchange` matches only active listings (and, on `nfn indices list`, only active exchanges) — a company whose sole listing on that exchange is delisted will not appear. `--market-segment` (`large_cap`, `mid_cap`, `small_cap`, `first_north_premier`, `first_north_growth`; comma-separated, case-sensitive) filters on the company's *primary* listing only, exists only for Nasdaq Nordic markets (every other listing has no segment and never matches), and combines with `--exchange` (which matches any active listing) as an AND. Available on `articles`, `stories`, `events`, `companies` and `calendar` list, but not on the `nfn companies <id> …` routes.
 
 11. **Disambiguate company names before assuming an identifier** — many Nordic company names map to multiple entities. For example, "Volvo" could mean AB Volvo (Volvo Group, ticker VOLV-B), Volvo Car AB (VOLCAR-B), Volvo Lastvagnar Sverige Ab, or Volvo Penta. When the user mentions a company by name, search first with `nfn companies list --q "name"` to see all matches, then either ask the user which one they mean or pick the most likely match and mention the alternatives. Never silently assume an identifier from an ambiguous name. Note: not all companies have a ticker — use the company ID when no ticker is available. To filter articles, stories, or calendar events by such a company, use `--company <id>` (the `--ticker` filter only reaches listed companies; `--company` also reaches private, unlisted, and delisted ones). Both `--ticker` and `--company` accept a comma-separated list (max 25, matching any of the named companies), e.g. `--ticker VOLV-B,ERIC-B`. Every value must resolve: an unknown ticker or ID now fails the whole request with a `400` naming the offending value (e.g. `Unknown ticker(s): VOLVB`) rather than silently returning an empty list. The other company-selecting filters (`--exchange`, `--market`, `--domicile`) still narrow silently on an unknown code. To resolve a batch of ids or tickers back to company names in one call — e.g. after a calendar or article page hands you `company_id`s — use `nfn companies list --company <id1,id2>` or `nfn companies list --ticker VOLV-B,ERIC-B` (both exact filters, max 25, and paginate normally). Results come back in name order, so key each row by its own `id`; a shared ticker can resolve to more than one company.
 
@@ -227,6 +227,7 @@ no id column.
 | Filter by legal domicile | `nfn articles list --domicile FI` |
 | Filter by index | `nfn articles list --index OMXS30` |
 | Filter by sector | `nfn articles list --sector Industrials` |
+| Filter by cap segment | `nfn articles list --market-segment large_cap` |
 | Filter by source | `nfn articles list --sources <id1,id2>` |
 | Filter by source type | `nfn articles list --source-type stock_exchange,wire_service` |
 | Filter by date range | `nfn articles list --published-after 2025-01-01 --published-before 2025-06-01` |
@@ -254,6 +255,7 @@ no id column.
 | Filter stories by legal domicile | `nfn stories list --domicile FI` |
 | Filter stories by index | `nfn stories list --index OMXS30` |
 | Filter stories by sector | `nfn stories list --sector Industrials` |
+| Filter stories by cap segment | `nfn stories list --market-segment large_cap` |
 | Filter stories by source | `nfn stories list --sources <id1,id2>` |
 | Search stories by text | `nfn stories list --q "battery"` |
 | Search stories by meaning | `nfn stories list --q "supply chain disruption" --semantic` |
@@ -305,6 +307,7 @@ no id column.
 | Filter by listing market | `nfn companies list --market SE` |
 | Filter by legal domicile | `nfn companies list --domicile SE` |
 | Filter by sector | `nfn companies list --sector Financials` |
+| Filter by cap segment | `nfn companies list --market-segment large_cap --exchange XHEL` |
 | Only companies with an active listing | `nfn companies list --listed` |
 | Only active companies | `nfn companies list --is-active` |
 | Get company details | `nfn companies get VOLV-B --format json` |
@@ -409,6 +412,7 @@ Looking for a company?
 ├── Want companies on an exchange? → nfn exchanges companies XSTO
 ├── Want companies in an index? → nfn indices companies OMXS30
 ├── Want companies in a sector? → nfn companies list --sector Financials
+├── Want Large/Mid/Small Cap or First North companies? → nfn companies list --market-segment large_cap
 ├── Want companies in a country? → nfn companies list --domicile SE
 ├── Want companies traded on a national market? → nfn companies list --market SE
 │   └── Includes First North / Spotlight / NGM, and foreign issuers listed there

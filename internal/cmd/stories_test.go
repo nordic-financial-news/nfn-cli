@@ -67,6 +67,11 @@ func TestBuildStoryParams(t *testing.T) {
 			wantKV: map[string]string{"q": "battery"},
 		},
 		{
+			name:   "market-segment maps to market_segment",
+			flags:  map[string]string{"market-segment": "large_cap,mid_cap"},
+			wantKV: map[string]string{"market_segment": "large_cap,mid_cap"},
+		},
+		{
 			name:   "market flag",
 			flags:  map[string]string{"market": "SE"},
 			wantKV: map[string]string{"market": "SE"},
@@ -127,6 +132,7 @@ func TestBuildStoryParams(t *testing.T) {
 			cmd.Flags().String("exchange", "", "")
 			cmd.Flags().String("index", "", "")
 			cmd.Flags().String("sector", "", "")
+			cmd.Flags().String("market-segment", "", "")
 			cmd.Flags().String("sources", "", "")
 			cmd.Flags().Bool("semantic", false, "")
 			cmd.Flags().Bool("listed", false, "")

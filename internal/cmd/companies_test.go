@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -78,6 +80,11 @@ func TestBuildCompanyParams(t *testing.T) {
 			wantKV: map[string]string{"sector": "Financials"},
 		},
 		{
+			name:   "market-segment maps to market_segment",
+			flags:  map[string]string{"market-segment": "large_cap,mid_cap"},
+			wantKV: map[string]string{"market_segment": "large_cap,mid_cap"},
+		},
+		{
 			name:   "listed bool maps to string true",
 			bools:  map[string]bool{"listed": true},
 			wantKV: map[string]string{"listed": "true"},
@@ -113,6 +120,7 @@ func TestBuildCompanyParams(t *testing.T) {
 			cmd.Flags().String("domicile", "", "")
 			cmd.Flags().String("exchange", "", "")
 			cmd.Flags().String("sector", "", "")
+			cmd.Flags().String("market-segment", "", "")
 			cmd.Flags().Bool("listed", false, "")
 			cmd.Flags().Bool("is-active", false, "")
 			cmd.Flags().Bool("watchlist", false, "")
@@ -186,7 +194,7 @@ func TestCompanyNewsRoutesRegisterFilterFlags(t *testing.T) {
 
 	// The nested routes describe one company via the path, so the company-selecting
 	// filters the API now 400s on must not be exposed on either route.
-	rejected := []string{"ticker", "company", "watchlist-id", "listed", "exchange", "market", "domicile", "index", "sector"}
+	rejected := []string{"ticker", "company", "watchlist-id", "listed", "exchange", "market", "domicile", "index", "sector", "market-segment"}
 	for _, name := range rejected {
 		if companiesArticlesCmd.Flags().Lookup(name) != nil {
 			t.Errorf("companies articles unexpectedly registers rejected filter --%s", name)
@@ -228,6 +236,7 @@ func TestBuildCompanyParamsIsActive(t *testing.T) {
 			cmd.Flags().String("domicile", "", "")
 			cmd.Flags().String("exchange", "", "")
 			cmd.Flags().String("sector", "", "")
+			cmd.Flags().String("market-segment", "", "")
 			cmd.Flags().Bool("listed", false, "")
 			cmd.Flags().Bool("is-active", false, "")
 			cmd.Flags().Bool("watchlist", false, "")
@@ -316,8 +325,9 @@ func TestUnfilteredCompanyList(t *testing.T) {
 func TestCompaniesGet_Detail(t *testing.T) {
 	body := `{"company":{"id":"co1","name":"AB Volvo","slug":"ab-volvo","ticker":"VOLV-B","is_active":true,` +
 		`"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"},` +
-		`"stock_listings":[{"ticker":"VOLV-B","primary":true,"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"}},` +
-		`{"ticker":"VOLV-A","primary":false,"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"}}],` +
+		`"market_segment":"large_cap",` +
+		`"stock_listings":[{"ticker":"VOLV-B","primary":true,"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"},"market_segment":"large_cap"},` +
+		`{"ticker":"VOLV-A","primary":false,"exchange":{"name":"Nasdaq Stockholm","mic_code":"XSTO"},"market_segment":"large_cap"}],` +
 		`"also_listed_on":[{"ticker":"VOLV-A","mic_code":"XSTO"}],` +
 		`"subsidiaries":[{"id":"sub1","name":"Volvo Penta"},{"id":"sub2","name":"Volvo Cars","ticker":"VOLCAR-B"}],` +
 		`"article_count":637,"story_count":24}}`
@@ -331,7 +341,8 @@ func TestCompaniesGet_Detail(t *testing.T) {
 		t.Errorf("VOLV-A appears %d times, want the two listing fields merged into one\n%s", n, out)
 	}
 	for _, want := range []string{
-		"VOLV-B · Nasdaq Stockholm (XSTO) · primary",
+		"VOLV-B · Nasdaq Stockholm (XSTO) · Large Cap · primary",
+		"VOLV-A · Nasdaq Stockholm (XSTO) · Large Cap",
 		"sub1      Volvo Penta", "VOLCAR-B  Volvo Cars",
 		"nfn companies events VOLV-B",
 		"637 articles:", "nfn companies articles VOLV-B",
@@ -340,6 +351,58 @@ func TestCompaniesGet_Detail(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q\n%s", want, out)
 		}
+	}
+}
+
+func TestCompaniesGet_JSONKeepsMarketSegment(t *testing.T) {
+	body := `{"company":{"id":"co1","name":"AB Volvo","ticker":"VOLV-B","is_active":true,"market_segment":"large_cap",` +
+		`"stock_listings":[{"ticker":"VOLV-B","primary":true,"exchange":{"mic_code":"XSTO"},"market_segment":"large_cap"},` +
+		`{"ticker":"VOLV-US","primary":false,"exchange":{"mic_code":"OTCM"},"market_segment":null}]}}`
+
+	out := runCommandWithArgs(t, companiesGetCmd, fixedBody(body), "json", []string{"VOLV-B"})
+
+	var envelope struct {
+		Data struct {
+			MarketSegment string                   `json:"market_segment"`
+			StockListings []map[string]interface{} `json:"stock_listings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &envelope); err != nil {
+		t.Fatalf("decoding output: %v\n%s", err, out)
+	}
+	if envelope.Data.MarketSegment != "large_cap" {
+		t.Errorf("market_segment = %q, want large_cap\n%s", envelope.Data.MarketSegment, out)
+	}
+	if len(envelope.Data.StockListings) != 2 {
+		t.Fatalf("len(stock_listings) = %d, want 2\n%s", len(envelope.Data.StockListings), out)
+	}
+	if got := envelope.Data.StockListings[0]["market_segment"]; got != "large_cap" {
+		t.Errorf("stock_listings[0].market_segment = %v, want large_cap", got)
+	}
+	if _, ok := envelope.Data.StockListings[1]["market_segment"]; ok {
+		t.Errorf("stock_listings[1] carries market_segment, want it omitted for a listing with none")
+	}
+}
+
+// The CLI does not validate --market-segment itself: the API's 400 already
+// names the valid values, so its detail has to reach the user unchanged.
+func TestCompaniesList_MarketSegmentRejectionPassesThrough(t *testing.T) {
+	const detail = "Unknown market segment(s): Large_Cap. Valid values: large_cap, mid_cap, small_cap, first_north_premier, first_north_growth"
+	var gotParams url.Values
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		gotParams = r.URL.Query()
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"type": "invalid-parameter", "title": "Invalid parameter", "detail": detail})
+	}
+
+	err := runListCommandExpectingError(t, companiesListCmd, handler, "--market-segment", "Large_Cap")
+
+	if got := gotParams.Get("market_segment"); got != "Large_Cap" {
+		t.Errorf("market_segment = %q, want the value forwarded as typed", got)
+	}
+	if err.Error() != detail {
+		t.Errorf("error = %q, want the API's detail %q", err.Error(), detail)
 	}
 }
 
@@ -361,6 +424,20 @@ func TestCompanyListings(t *testing.T) {
 			name:    "summary fields when the detail listings are absent",
 			company: api.Company{TickerSymbol: "VOLV-B", Exchange: &api.Exchange{MicCode: "XSTO"}, AlsoListedOn: []api.OtherListing{{TickerSymbol: "VOLV-A", MicCode: "XSTO"}}},
 			want:    []string{"VOLV-B · XSTO", "VOLV-A · XSTO"},
+		},
+		{
+			name: "each listing names its own segment, and none is shown where it is empty",
+			company: api.Company{StockListings: []api.StockListing{
+				{TickerSymbol: "NDA-FI", Primary: true, Exchange: api.Exchange{MicCode: "XHEL"}, MarketSegment: "large_cap"},
+				{TickerSymbol: "NDA-SE", Exchange: api.Exchange{MicCode: "XSTO"}, MarketSegment: "first_north_growth"},
+				{TickerSymbol: "NDA-US", Exchange: api.Exchange{MicCode: "OTCM"}},
+			}},
+			want: []string{"NDA-FI · XHEL · Large Cap · primary", "NDA-SE · XSTO · First North Growth", "NDA-US · OTCM"},
+		},
+		{
+			name:    "the summary's segment follows its primary ticker",
+			company: api.Company{TickerSymbol: "ELISA", Exchange: &api.Exchange{MicCode: "XHEL"}, MarketSegment: "mid_cap"},
+			want:    []string{"ELISA · XHEL · Mid Cap"},
 		},
 	}
 	for _, tt := range tests {

@@ -146,6 +146,10 @@ const (
 	semanticMaxQuery = 200
 )
 
+func addMarketSegmentFlag(cmd *cobra.Command) {
+	cmd.Flags().String("market-segment", "", "Filter by the primary listing's cap segment (comma-separated: large_cap, mid_cap, small_cap, first_north_premier, first_north_growth). Nasdaq Nordic markets only")
+}
+
 func addSemanticFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("semantic", false, "Match --q by meaning rather than by keyword, ranking results by embedding similarity; requires --q (2-200 characters) and returns a single page with a distance on each result")
 }

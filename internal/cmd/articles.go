@@ -30,6 +30,7 @@ are not human-verified.`,
   nfn articles list --ticker VOLV-B --primary-only
   nfn articles list --company uejazctgchj4
   nfn articles list --exchange XSTO,XCSE --sector Industrials
+  nfn articles list --market-segment large_cap --exchange XHEL
   nfn articles list --market SE
   nfn articles list --domicile FI
   nfn articles list --index OMXS30
@@ -184,6 +185,9 @@ func buildArticleParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
 	}
+	if v, _ := cmd.Flags().GetString("market-segment"); v != "" {
+		params.Set("market_segment", v)
+	}
 	if v, _ := cmd.Flags().GetBool("semantic"); v {
 		params.Set("mode", "semantic")
 	}
@@ -267,6 +271,7 @@ func init() {
 	articlesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	articlesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	articlesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
+	addMarketSegmentFlag(articlesListCmd)
 	articlesListCmd.Flags().String("content-type", "", "Filter by content type")
 	articlesListCmd.Flags().String("published-after", "", "Filter by published after date")
 	articlesListCmd.Flags().String("published-before", "", "Filter by published before date")

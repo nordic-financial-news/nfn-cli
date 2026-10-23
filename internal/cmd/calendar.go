@@ -185,6 +185,9 @@ func buildCalendarParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
 	}
+	if v, _ := cmd.Flags().GetString("market-segment"); v != "" {
+		params.Set("market_segment", v)
+	}
 	if v, _ := cmd.Flags().GetString("event-type"); v != "" {
 		params.Set("event_type", v)
 	}
@@ -438,6 +441,7 @@ func init() {
 	calendarListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	calendarListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	calendarListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
+	addMarketSegmentFlag(calendarListCmd)
 	calendarListCmd.Flags().String("event-type", "", "Filter by event type (comma-separated): "+calendarTypeSlugs())
 	calendarListCmd.Flags().String("status", "", "Filter by status (scheduled, published, cancelled)")
 	calendarListCmd.Flags().String("scheduled-after", "", "Start of the scheduled-time window. A bare date (2026-10-01) is that calendar date in the issuer's own timezone, inclusive; an ISO 8601 datetime (2026-10-01T00:00:00Z, or with a UTC offset) is that exact instant, at or after")

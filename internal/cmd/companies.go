@@ -24,6 +24,7 @@ var companiesListCmd = &cobra.Command{
   nfn companies list --company 64hn2d7ul6kr,7f3k9m2p1q8r
   nfn companies list --q "offshore wind turbine installation" --semantic
   nfn companies list --country SE --sector Financials
+  nfn companies list --market-segment large_cap --exchange XHEL
   nfn companies list --exchange XSTO,XCSE --listed
   nfn companies list --market SE
   nfn companies list --domicile FI
@@ -193,6 +194,9 @@ func companyListings(c *api.Company) []string {
 		lines := make([]string, len(c.StockListings))
 		for i, l := range c.StockListings {
 			lines[i] = l.TickerSymbol + " · " + exchangeLabel(&l.Exchange)
+			if l.MarketSegment != "" {
+				lines[i] += " · " + marketSegmentLabel(l.MarketSegment)
+			}
 			if l.Primary && len(c.StockListings) > 1 {
 				lines[i] += " · primary"
 			}
@@ -206,6 +210,9 @@ func companyListings(c *api.Company) []string {
 	if c.Exchange != nil {
 		lines[0] += " · " + exchangeLabel(c.Exchange)
 	}
+	if c.MarketSegment != "" {
+		lines[0] += " · " + marketSegmentLabel(c.MarketSegment)
+	}
 	for _, l := range c.AlsoListedOn {
 		lines = append(lines, l.TickerSymbol+" · "+l.MicCode)
 	}
@@ -217,6 +224,23 @@ func exchangeLabel(e *api.Exchange) string {
 		return e.MicCode
 	}
 	return fmt.Sprintf("%s (%s)", e.Name, e.MicCode)
+}
+
+var marketSegmentLabels = map[string]string{
+	"large_cap":           "Large Cap",
+	"mid_cap":             "Mid Cap",
+	"small_cap":           "Small Cap",
+	"first_north_premier": "First North Premier",
+	"first_north_growth":  "First North Growth",
+}
+
+// marketSegmentLabel is a segment as Nasdaq names it, or the raw value for one
+// the API adds before the CLI knows it.
+func marketSegmentLabel(s string) string {
+	if label, ok := marketSegmentLabels[s]; ok {
+		return label
+	}
+	return s
 }
 
 // companyNextSteps points at the feeds a company page is the way into, with
@@ -311,9 +335,9 @@ var companiesEventsCmd = &cobra.Command{
 
 The path fixes the company, so the filters that name a different company or
 listing — --ticker, --company, --watchlist-id, --listed, --exchange, --market,
---domicile, --index and --sector — are not offered here. Use 'nfn events list'
-with --company to filter the full collection by any of them, and to search one
-company's events by meaning with --semantic.`,
+--domicile, --index, --sector and --market-segment — are not offered here. Use
+'nfn events list' with --company to filter the full collection by any of them,
+and to search one company's events by meaning with --semantic.`,
 	Example: `  nfn companies events VOLV-B --limit 5
   nfn companies events VOLV-B --significance notable
   nfn companies events VOLV-B --event-type earnings-report
@@ -389,6 +413,9 @@ func buildCompanyParams(cmd *cobra.Command) url.Values {
 	}
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
+	}
+	if v, _ := cmd.Flags().GetString("market-segment"); v != "" {
+		params.Set("market_segment", v)
 	}
 	if v, _ := cmd.Flags().GetBool("listed"); v {
 		params.Set("listed", "true")
@@ -486,7 +513,9 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 
 // companyListing is a company's main listing as "VOLV-B · XSTO", or "unlisted",
 // so a list tells the tradable companies from the subsidiaries and private
-// firms a name search also finds.
+// firms a name search also finds. The cap segment stays out: "First North
+// Growth" more than doubles the cell, and at 80 columns the fit then drops the
+// whole Listing column, ticker included. JSON carries market_segment.
 func companyListing(c api.Company) string {
 	switch {
 	case c.TickerSymbol == "":
@@ -507,6 +536,7 @@ func init() {
 	companiesListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted companies, excludes foreign-domiciled issuers listed locally")
 	companiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE); requires an active listing on that exchange")
 	companiesListCmd.Flags().String("sector", "", "Filter by sector (e.g. Financials)")
+	addMarketSegmentFlag(companiesListCmd)
 	companiesListCmd.Flags().Bool("listed", false, "Only show companies with an active stock listing")
 	companiesListCmd.Flags().Bool("is-active", false, "Only show active companies")
 	companiesListCmd.Flags().Bool("watchlist", false, "Only show watchlisted companies")

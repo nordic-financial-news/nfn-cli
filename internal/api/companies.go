@@ -19,6 +19,7 @@ type Company struct {
 	Country       *CompanyCountry `json:"country,omitempty"`
 	Description   string          `json:"description,omitempty"`
 	Sector        string          `json:"sector,omitempty"`
+	MarketSegment string          `json:"market_segment,omitempty"`
 	Website       string          `json:"website,omitempty"`
 	ParentCompany *Company        `json:"parent_company,omitempty"`
 	Subsidiaries  []Company       `json:"subsidiaries,omitempty"`
@@ -49,9 +50,10 @@ type CompanyCountry struct {
 }
 
 type StockListing struct {
-	TickerSymbol string   `json:"ticker"`
-	Primary      bool     `json:"primary"`
-	Exchange     Exchange `json:"exchange"`
+	TickerSymbol  string   `json:"ticker"`
+	Primary       bool     `json:"primary"`
+	Exchange      Exchange `json:"exchange"`
+	MarketSegment string   `json:"market_segment,omitempty"`
 }
 
 type Registry struct {

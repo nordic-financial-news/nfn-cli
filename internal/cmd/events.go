@@ -275,6 +275,7 @@ var eventFilterFlags = []struct{ flag, param string }{
 	{"domicile", "domicile"},
 	{"index", "index"},
 	{"sector", "sector"},
+	{"market-segment", "market_segment"},
 	{"watchlist-id", "watchlist"},
 	{"first-reported-after", "first_reported_after"},
 	{"first-reported-before", "first_reported_before"},
@@ -649,6 +650,7 @@ func init() {
 	eventsListCmd.Flags().String("domicile", "", "Filter by legal domicile country (comma-separated ISO2, e.g. SE,NO): reaches unlisted issuers, excludes foreign-domiciled issuers listed locally")
 	eventsListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	eventsListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Industrials); must match a standard sector name exactly")
+	addMarketSegmentFlag(eventsListCmd)
 	eventsListCmd.Flags().Bool("listed", false, "Only events involving at least one company with an active listing; --include-peripheral does not widen this")
 	eventsListCmd.Flags().String("watchlist-id", "", "Only show events for companies in this watchlist (see 'nfn watchlists list')")
 	addPaginationFlags(eventsListCmd)

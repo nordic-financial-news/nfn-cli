@@ -92,6 +92,11 @@ func TestBuildArticleParams(t *testing.T) {
 			wantKV: map[string]string{"exchange": "XSTO", "index": "OMXS30", "sector": "Industrials"},
 		},
 		{
+			name:   "market-segment maps to market_segment",
+			flags:  map[string]string{"market-segment": "large_cap,mid_cap"},
+			wantKV: map[string]string{"market_segment": "large_cap,mid_cap"},
+		},
+		{
 			name:   "market flag",
 			flags:  map[string]string{"market": "SE"},
 			wantKV: map[string]string{"market": "SE"},
@@ -149,6 +154,7 @@ func TestBuildArticleParams(t *testing.T) {
 			cmd.Flags().String("exchange", "", "")
 			cmd.Flags().String("index", "", "")
 			cmd.Flags().String("sector", "", "")
+			cmd.Flags().String("market-segment", "", "")
 			cmd.Flags().String("content-type", "", "")
 			cmd.Flags().String("published-after", "", "")
 			cmd.Flags().String("published-before", "", "")

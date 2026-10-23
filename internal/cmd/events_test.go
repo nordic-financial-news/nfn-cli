@@ -48,6 +48,7 @@ func TestBuildEventParams(t *testing.T) {
 		"domicile":              "FI",
 		"index":                 "OMXS30",
 		"sector":                "Industrials",
+		"market-segment":        "small_cap",
 		"watchlist-id":          "wl_8fk2a1b3c4d5",
 		"first-reported-after":  "2026-01-01T00:00:00Z",
 		"first-reported-before": "2026-12-31T23:59:59Z",
@@ -81,6 +82,7 @@ func TestBuildEventParams(t *testing.T) {
 		"domicile":              "FI",
 		"index":                 "OMXS30",
 		"sector":                "Industrials",
+		"market_segment":        "small_cap",
 		"watchlist":             "wl_8fk2a1b3c4d5",
 		"first_reported_after":  "2026-01-01T00:00:00Z",
 		"first_reported_before": "2026-12-31T23:59:59Z",
@@ -128,7 +130,7 @@ func TestBuildEventParamsSendsNothingByDefault(t *testing.T) {
 func TestCompanyEventsRouteOmitsRejectedFilters(t *testing.T) {
 	rejected := []string{
 		"ticker", "company", "watchlist-id", "listed", "exchange",
-		"market", "domicile", "index", "sector", "semantic",
+		"market", "domicile", "index", "sector", "market-segment", "semantic",
 		"published-after", "published-before",
 	}
 	for _, flag := range rejected {
@@ -178,7 +180,7 @@ func TestCompanyEventsRouteOffersAcceptedFilters(t *testing.T) {
 	}
 	for _, param := range []string{
 		"ticker", "company", "watchlist", "listed", "exchange", "market",
-		"domicile", "index", "sector", "mode", "published_after", "published_before",
+		"domicile", "index", "sector", "market_segment", "mode", "published_after", "published_before",
 	} {
 		if _, ok := params[param]; ok {
 			t.Errorf("params[%q] = %q, want it absent on the company route", param, params.Get(param))

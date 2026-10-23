@@ -25,6 +25,7 @@ var storiesListCmd = &cobra.Command{
   nfn stories list --ticker VOLV-B,ERIC-B
   nfn stories list --company uejazctgchj4
   nfn stories list --exchange XSTO,XCSE --sector Industrials
+  nfn stories list --market-segment large_cap --exchange XHEL
   nfn stories list --market SE
   nfn stories list --domicile FI
   nfn stories list --index OMXS30
@@ -165,6 +166,9 @@ func buildStoryParams(cmd *cobra.Command) url.Values {
 	if v, _ := cmd.Flags().GetString("sector"); v != "" {
 		params.Set("sector", v)
 	}
+	if v, _ := cmd.Flags().GetString("market-segment"); v != "" {
+		params.Set("market_segment", v)
+	}
 	if v, _ := cmd.Flags().GetBool("semantic"); v {
 		params.Set("mode", "semantic")
 	}
@@ -242,6 +246,7 @@ func init() {
 	storiesListCmd.Flags().String("exchange", "", "Filter by exchange MIC code (comma-separated, e.g. XSTO,XCSE)")
 	storiesListCmd.Flags().String("index", "", "Filter by stock index ID or symbol (e.g. OMXS30)")
 	storiesListCmd.Flags().String("sector", "", "Filter by company sector (e.g. Financials)")
+	addMarketSegmentFlag(storiesListCmd)
 	storiesListCmd.Flags().String("sources", "", "Filter by source IDs (comma-separated, max 25)")
 	storiesListCmd.Flags().Bool("listed", false, "Only show stories about listed companies")
 	storiesListCmd.Flags().String("watchlist-id", "", "Only show stories for companies in this watchlist (see 'nfn watchlists list')")
