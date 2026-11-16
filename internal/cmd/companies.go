@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/nordic-financial-news/nfn-cli/internal/api"
@@ -21,6 +24,7 @@ var companiesListCmd = &cobra.Command{
 	Example: `  nfn companies list --limit 10
   nfn companies list --q "Volvo"
   nfn companies list --ticker VOLV-B,ERIC-B
+  nfn companies list --isin SE0000115446,SE0000108656
   nfn companies list --company 64hn2d7ul6kr,7f3k9m2p1q8r
   nfn companies list --q "offshore wind turbine installation" --semantic
   nfn companies list --country SE --sector Financials
@@ -66,15 +70,20 @@ var companiesListCmd = &cobra.Command{
 var companiesGetCmd = &cobra.Command{
 	Use:   "get <identifier>",
 	Short: "Get company details",
-	Long:  "Get company details. The identifier can be a company ID or ticker symbol.",
+	Long:  "Get company details. The identifier can be a company ID, ticker symbol or ISIN.",
 	Example: `  nfn companies get VOLV-B
+  nfn companies get SE0000115446
   nfn companies get 64hn2d7ul6kr --format json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := apiClientFromContext(cmd)
 		f := formatterFromContext(cmd)
 
-		company, _, err := client.GetCompany(cmd.Context(), args[0])
+		var company *api.Company
+		err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+			company, _, err = client.GetCompany(cmd.Context(), id)
+			return err
+		})
 		if err != nil {
 			return companyNotFoundError(err, args[0])
 		}
@@ -193,7 +202,7 @@ func companyListings(c *api.Company) []string {
 	if len(c.StockListings) > 0 {
 		lines := make([]string, len(c.StockListings))
 		for i, l := range c.StockListings {
-			lines[i] = l.TickerSymbol + " · " + exchangeLabel(&l.Exchange)
+			lines[i] = withISIN(l.TickerSymbol, l.ISIN) + " · " + exchangeLabel(&l.Exchange)
 			if l.MarketSegment != "" {
 				lines[i] += " · " + marketSegmentLabel(l.MarketSegment)
 			}
@@ -206,7 +215,7 @@ func companyListings(c *api.Company) []string {
 	if c.TickerSymbol == "" {
 		return []string{"Not listed"}
 	}
-	lines := []string{c.TickerSymbol}
+	lines := []string{withISIN(c.TickerSymbol, c.ISIN)}
 	if c.Exchange != nil {
 		lines[0] += " · " + exchangeLabel(c.Exchange)
 	}
@@ -214,9 +223,18 @@ func companyListings(c *api.Company) []string {
 		lines[0] += " · " + marketSegmentLabel(c.MarketSegment)
 	}
 	for _, l := range c.AlsoListedOn {
-		lines = append(lines, l.TickerSymbol+" · "+l.MicCode)
+		lines = append(lines, withISIN(l.TickerSymbol, l.ISIN)+" · "+l.MicCode)
 	}
 	return lines
+}
+
+// withISIN pairs a ticker with its listing's ISIN, the two names a listing is
+// looked up by.
+func withISIN(ticker, isin string) string {
+	if isin == "" {
+		return ticker
+	}
+	return ticker + " · " + isin
 }
 
 func exchangeLabel(e *api.Exchange) string {
@@ -281,14 +299,25 @@ var companiesArticlesCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			articles, resp, err := client.ListAllCompanyArticles(cmd.Context(), args[0], params)
+			var articles []api.Article
+			var resp *api.Response
+			err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+				articles, resp, err = client.ListAllCompanyArticles(cmd.Context(), id, params)
+				return err
+			})
 			if err != nil {
 				return companyNotFoundError(err, args[0])
 			}
 			return renderArticles(f, articles, nil, planLimitedFrom(resp), listOpts{path: "nfn companies articles", order: orderNote(cmd, true)})
 		}
 
-		articles, pagination, resp, err := client.ListCompanyArticles(cmd.Context(), args[0], params)
+		var articles []api.Article
+		var pagination *api.Pagination
+		var resp *api.Response
+		err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+			articles, pagination, resp, err = client.ListCompanyArticles(cmd.Context(), id, params)
+			return err
+		})
 		if err != nil {
 			return companyNotFoundError(err, args[0])
 		}
@@ -313,14 +342,25 @@ var companiesStoriesCmd = &cobra.Command{
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			stories, resp, err := client.ListAllCompanyStories(cmd.Context(), args[0], params)
+			var stories []api.Story
+			var resp *api.Response
+			err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+				stories, resp, err = client.ListAllCompanyStories(cmd.Context(), id, params)
+				return err
+			})
 			if err != nil {
 				return companyNotFoundError(err, args[0])
 			}
 			return renderStories(f, stories, nil, planLimitedFrom(resp), listOpts{path: "nfn companies stories", order: orderNote(cmd, true)})
 		}
 
-		stories, pagination, resp, err := client.ListCompanyStories(cmd.Context(), args[0], params)
+		var stories []api.Story
+		var pagination *api.Pagination
+		var resp *api.Response
+		err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+			stories, pagination, resp, err = client.ListCompanyStories(cmd.Context(), id, params)
+			return err
+		})
 		if err != nil {
 			return companyNotFoundError(err, args[0])
 		}
@@ -356,14 +396,25 @@ and to search one company's events by meaning with --semantic.`,
 
 		all, _ := cmd.Flags().GetBool("all")
 		if all {
-			events, resp, err := client.ListAllCompanyEvents(cmd.Context(), args[0], params)
+			var events []api.Event
+			var resp *api.Response
+			err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+				events, resp, err = client.ListAllCompanyEvents(cmd.Context(), id, params)
+				return err
+			})
 			if err != nil {
 				return eventTypeError(companyNotFoundError(err, args[0]))
 			}
 			return renderEvents(f, events, nil, planLimitedFrom(resp), truncatedFrom(resp), "nfn companies events")
 		}
 
-		events, pagination, resp, err := client.ListCompanyEvents(cmd.Context(), args[0], params)
+		var events []api.Event
+		var pagination *api.Pagination
+		var resp *api.Response
+		err := withCompany(cmd.Context(), client, args[0], func(id string) (err error) {
+			events, pagination, resp, err = client.ListCompanyEvents(cmd.Context(), id, params)
+			return err
+		})
 		if err != nil {
 			return eventTypeError(companyNotFoundError(err, args[0]))
 		}
@@ -395,6 +446,9 @@ func buildCompanyParams(cmd *cobra.Command) url.Values {
 	}
 	if v, _ := cmd.Flags().GetString("company"); v != "" {
 		params.Set("company", v)
+	}
+	if v, _ := cmd.Flags().GetString("isin"); v != "" {
+		params.Set("isin", v)
 	}
 	if v, _ := cmd.Flags().GetBool("semantic"); v {
 		params.Set("mode", "semantic")
@@ -462,7 +516,9 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 	// Inactive companies are rare, so a Status column on every page would be a
 	// column of blanks; it appears only when the page holds one. Only a semantic
 	// search returns distances, so that column likewise appears only with them.
-	showStatus, showDistance := false, false
+	// ISIN is wide and rarely what a reader scans a list for, so its column
+	// appears only when --fields names it.
+	showStatus, showDistance, showISIN := false, false, f.Fields()["isin"]
 	for _, c := range companies {
 		showStatus = showStatus || !c.IsActive
 		showDistance = showDistance || c.Distance != nil
@@ -470,6 +526,10 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 
 	columns := []string{"ID", "Name", "Listing"}
 	colFields := [][]string{{"id"}, {"name"}, {"ticker"}}
+	if showISIN {
+		columns = append(columns, "ISIN")
+		colFields = append(colFields, []string{"isin"})
+	}
 	if showStatus {
 		columns = append(columns, "Status")
 		colFields = append(colFields, []string{"is_active"})
@@ -481,6 +541,9 @@ func renderCompanies(f *output.Formatter, companies []api.Company, pagination *a
 	rows := make([][]string, len(companies))
 	for i, c := range companies {
 		row := []string{c.ID, c.Name, companyListing(c)}
+		if showISIN {
+			row = append(row, c.ISIN)
+		}
 		if showStatus {
 			status := ""
 			if !c.IsActive {
@@ -527,9 +590,58 @@ func companyListing(c api.Company) string {
 	}
 }
 
+// isinShape is an ISIN's form: a country code, nine alphanumerics and a check
+// digit. A lowercase company ID can take the same form, so the shape alone
+// never decides how an identifier is read.
+var isinShape = regexp.MustCompile(`^[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]$`)
+
+// withCompany runs call against a company route, retrying with the company's
+// ID when an ISIN-shaped identifier 404s. The routes take an ID or a ticker,
+// not an ISIN, and the ID or ticker is tried first, as the API orders them, so
+// an ISIN never shadows a company ID of the same shape.
+func withCompany(ctx context.Context, client *api.Client, identifier string, call func(id string) error) error {
+	err := call(identifier)
+	var apiErr *api.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != 404 || !isinShape.MatchString(identifier) {
+		return err
+	}
+	id, rerr := companyIDForISIN(ctx, client, identifier)
+	if rerr != nil {
+		return rerr
+	}
+	if id == "" {
+		return err
+	}
+	return call(id)
+}
+
+// companyIDForISIN resolves an ISIN through the companies filter. An unknown
+// ISIN is no company rather than an error, so the caller reports the route's
+// own 404.
+func companyIDForISIN(ctx context.Context, client *api.Client, isin string) (string, error) {
+	params := url.Values{"isin": {isin}, "fields": {"id,name,ticker"}}
+	companies, _, _, err := client.ListCompanies(ctx, params)
+	var apiErr *api.APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == 400 {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	switch len(companies) {
+	case 0:
+		return "", nil
+	case 1:
+		return companies[0].ID, nil
+	default:
+		return "", fmt.Errorf("ISIN %s matches more than one company; name one of them instead:\n%s", strings.ToUpper(isin), handleLines(companies))
+	}
+}
+
 func init() {
 	companiesListCmd.Flags().String("q", "", "Search company names and aliases")
 	companiesListCmd.Flags().String("ticker", "", "Look up companies by ticker (comma-separated, max 25, e.g. VOLV-B,ERIC-B): an exact filter that resolves former and exchange-suffixed tickers; every value must resolve or the request errors")
+	companiesListCmd.Flags().String("isin", "", "Look up companies by ISIN (comma-separated, max 25, e.g. SE0000115446): an exact, case-insensitive filter that resolves former listings' ISINs too; every value must resolve or the request errors")
 	companiesListCmd.Flags().String("company", "", "Look up companies by ID (comma-separated, max 25): an exact filter; every value must resolve or the request errors")
 	companiesListCmd.Flags().String("country", "", "Filter by legal domicile country code (comma-separated ISO2, e.g. SE,NO); --domicile is the canonical name for the same filter")
 	companiesListCmd.Flags().String("market", "", "Filter by listing-venue country (comma-separated ISO2, e.g. SE,NO): companies with an active equity listing on an exchange in these countries, including foreign-domiciled issuers")

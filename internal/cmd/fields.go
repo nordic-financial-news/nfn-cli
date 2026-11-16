@@ -40,7 +40,7 @@ var fieldVocabularies = map[string][]string{
 		"scheduled_at_changed_at", "source_article_id", "company_id", "company",
 		"country", "dividend", "updated_at",
 	},
-	"company":  {"id", "name", "slug", "ticker", "former_tickers"},
+	"company":  {"id", "name", "slug", "ticker", "isin", "former_tickers"},
 	"source":   {"id", "name", "domain", "country", "source_type"},
 	"exchange": {"id", "name", "mic_code", "acronym", "country"},
 	"index":    {"id", "name", "symbol", "pan_nordic", "exchange"},

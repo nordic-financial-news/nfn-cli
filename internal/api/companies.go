@@ -10,6 +10,10 @@ type Company struct {
 	Name         string `json:"name"`
 	Slug         string `json:"slug"`
 	TickerSymbol string `json:"ticker"`
+	// ISIN is the primary listing's. It is null when unknown, and only current
+	// listings carry one, so a company found by a former listing's ISIN may show
+	// none.
+	ISIN string `json:"isin,omitempty"`
 	// FormerTickers are symbols of delisted listings, minus any symbol an active
 	// listing still holds. Requestable via --fields, so the field has to exist for
 	// the value to survive the round trip.
@@ -41,6 +45,7 @@ type Company struct {
 type OtherListing struct {
 	TickerSymbol string `json:"ticker"`
 	MicCode      string `json:"mic_code"`
+	ISIN         string `json:"isin,omitempty"`
 }
 
 type CompanyCountry struct {
@@ -51,6 +56,7 @@ type CompanyCountry struct {
 
 type StockListing struct {
 	TickerSymbol  string   `json:"ticker"`
+	ISIN          string   `json:"isin,omitempty"`
 	Primary       bool     `json:"primary"`
 	Exchange      Exchange `json:"exchange"`
 	MarketSegment string   `json:"market_segment,omitempty"`

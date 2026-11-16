@@ -119,7 +119,7 @@ Two things make the CLI self-describing, so an agent does not need the docs in i
 | `nfn calendar list` | List calendar events (earnings, dividends, AGMs, etc.) |
 | `nfn calendar get <id>` | Get calendar event details |
 | `nfn companies list` | List companies |
-| `nfn companies get <identifier>` | Get company details (by ID or ticker) |
+| `nfn companies get <identifier>` | Get company details (by ID, ticker or ISIN) |
 | `nfn companies articles <identifier>` | List articles for a company |
 | `nfn companies stories <identifier>` | List stories for a company |
 | `nfn companies events <identifier>` | List events for a company |

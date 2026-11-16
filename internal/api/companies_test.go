@@ -79,3 +79,25 @@ func TestCompany_MarketSegmentRoundTrip(t *testing.T) {
 		t.Errorf("stock_listings[0].market_segment = %v after the round trip, want large_cap", listing["market_segment"])
 	}
 }
+
+func TestCompany_ISINs(t *testing.T) {
+	t.Parallel()
+	in := `{"id":"cmp1","name":"AB Volvo","ticker":"VOLV-B","isin":"SE0000115446","is_active":true,"exchange":null,` +
+		`"stock_listings":[{"ticker":"VOLV-B","isin":"SE0000115446","primary":true,"exchange":{"mic_code":"XSTO"}},` +
+		`{"ticker":"VOLV-US","isin":null,"primary":false,"exchange":{"mic_code":"OTCM"}}],` +
+		`"also_listed_on":[{"ticker":"VOLV-A","mic_code":"XSTO","isin":"SE0000115420"}]}`
+
+	var company Company
+	if err := json.Unmarshal([]byte(in), &company); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+	if company.ISIN != "SE0000115446" {
+		t.Errorf("ISIN = %q, want SE0000115446", company.ISIN)
+	}
+	if company.StockListings[0].ISIN != "SE0000115446" || company.StockListings[1].ISIN != "" {
+		t.Errorf("StockListings = %+v, want the first listing's ISIN and none on the second", company.StockListings)
+	}
+	if company.AlsoListedOn[0].ISIN != "SE0000115420" {
+		t.Errorf("AlsoListedOn[0].ISIN = %q, want SE0000115420", company.AlsoListedOn[0].ISIN)
+	}
+}

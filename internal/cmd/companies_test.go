@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -40,6 +43,11 @@ func TestBuildCompanyParams(t *testing.T) {
 			name:   "company batch lookup accepts comma-separated ids",
 			flags:  map[string]string{"company": "64hn2d7ul6kr,7f3k9m2p1q8r"},
 			wantKV: map[string]string{"company": "64hn2d7ul6kr,7f3k9m2p1q8r"},
+		},
+		{
+			name:   "isin batch lookup accepts comma-separated list",
+			flags:  map[string]string{"isin": "SE0000115446,FI4000297767"},
+			wantKV: map[string]string{"isin": "SE0000115446,FI4000297767"},
 		},
 		{
 			name:   "ticker and company intersect when both sent",
@@ -115,6 +123,7 @@ func TestBuildCompanyParams(t *testing.T) {
 			cmd.Flags().String("q", "", "")
 			cmd.Flags().String("ticker", "", "")
 			cmd.Flags().String("company", "", "")
+			cmd.Flags().String("isin", "", "")
 			cmd.Flags().String("country", "", "")
 			cmd.Flags().String("market", "", "")
 			cmd.Flags().String("domicile", "", "")
@@ -231,6 +240,7 @@ func TestBuildCompanyParamsIsActive(t *testing.T) {
 			cmd.Flags().String("q", "", "")
 			cmd.Flags().String("ticker", "", "")
 			cmd.Flags().String("company", "", "")
+			cmd.Flags().String("isin", "", "")
 			cmd.Flags().String("country", "", "")
 			cmd.Flags().String("market", "", "")
 			cmd.Flags().String("domicile", "", "")
@@ -276,6 +286,20 @@ func TestCompaniesList_Table(t *testing.T) {
 		}
 		if strings.Contains(out, "STATUS") {
 			t.Errorf("output has a Status column on an all-active page\n%s", out)
+		}
+		if strings.Contains(out, "ISIN") {
+			t.Errorf("output has an ISIN column nobody asked for\n%s", out)
+		}
+	})
+
+	t.Run("--fields isin brings in the ISIN column", func(t *testing.T) {
+		body := `{"companies":[{"id":"co1","name":"AB Volvo","ticker":"VOLV-B","isin":"SE0000115446"}],"pagination":{"count":1}}`
+		out := runListCommand(t, companiesListCmd, fixedBody(body), "table", "--q", "Volvo", "--fields", "name,isin")
+		if !strings.Contains(out, "ISIN") || !strings.Contains(out, "SE0000115446") {
+			t.Errorf("output = %q, want an ISIN column", out)
+		}
+		if strings.Contains(out, "has no table column") {
+			t.Errorf("output = %q, want isin shown rather than sent to JSON", out)
 		}
 	})
 
@@ -435,6 +459,20 @@ func TestCompanyListings(t *testing.T) {
 			want: []string{"NDA-FI · XHEL · Large Cap · primary", "NDA-SE · XSTO · First North Growth", "NDA-US · OTCM"},
 		},
 		{
+			name: "each listing names its own ISIN beside its ticker",
+			company: api.Company{StockListings: []api.StockListing{
+				{TickerSymbol: "VOLV-B", ISIN: "SE0000115446", Primary: true, Exchange: api.Exchange{MicCode: "XSTO"}},
+				{TickerSymbol: "VOLV-US", Exchange: api.Exchange{MicCode: "OTCM"}},
+			}},
+			want: []string{"VOLV-B · SE0000115446 · XSTO · primary", "VOLV-US · OTCM"},
+		},
+		{
+			name: "summary ISINs follow their tickers",
+			company: api.Company{TickerSymbol: "VOLV-B", ISIN: "SE0000115446", Exchange: &api.Exchange{MicCode: "XSTO"},
+				AlsoListedOn: []api.OtherListing{{TickerSymbol: "VOLV-A", MicCode: "XSTO", ISIN: "SE0000115420"}}},
+			want: []string{"VOLV-B · SE0000115446 · XSTO", "VOLV-A · SE0000115420 · XSTO"},
+		},
+		{
 			name:    "the summary's segment follows its primary ticker",
 			company: api.Company{TickerSymbol: "ELISA", Exchange: &api.Exchange{MicCode: "XHEL"}, MarketSegment: "mid_cap"},
 			want:    []string{"ELISA · XHEL · Mid Cap"},
@@ -460,5 +498,124 @@ func TestCompanyNextStepsForAnUnlistedCompany(t *testing.T) {
 	}
 	if strings.Contains(got, "calendar") || strings.Contains(got, "stories") {
 		t.Errorf("steps = %q, want no calendar or empty stories step", got)
+	}
+}
+
+// isinRoutes serves a company route that knows companies by ID and ticker
+// only, and a companies filter that resolves ISINs, recording each request.
+func isinRoutes(t *testing.T, byISIN map[string]string, requests *[]string) http.HandlerFunc {
+	t.Helper()
+	known := map[string]bool{"co1": true, "VOLV-B": true}
+	return func(w http.ResponseWriter, r *http.Request) {
+		*requests = append(*requests, r.URL.Path+"?"+r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/companies" {
+			isin := r.URL.Query().Get("isin")
+			body, ok := byISIN[isin]
+			if !ok {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = fmt.Fprintf(w, `{"title":"Invalid parameter","detail":"Unknown ISIN(s): %s"}`, isin)
+				return
+			}
+			_, _ = w.Write([]byte(body))
+			return
+		}
+		if !known[strings.TrimPrefix(r.URL.Path, "/companies/")] {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"title":"Not found"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"company":{"id":"co1","name":"AB Volvo","ticker":"VOLV-B","isin":"SE0000115446","is_active":true}}`))
+	}
+}
+
+func TestWithCompany(t *testing.T) {
+	t.Parallel()
+	volvo := `{"companies":[{"id":"co1","name":"AB Volvo","ticker":"VOLV-B"}],"pagination":{"count":1}}`
+	twoCompanies := `{"companies":[{"id":"co1","name":"AB Volvo","ticker":"VOLV-B"},{"id":"co9","name":"Volvo Holding"}],"pagination":{"count":2}}`
+
+	tests := []struct {
+		name         string
+		identifier   string
+		byISIN       map[string]string
+		wantRequests []string
+		wantErr      string
+		want404      bool
+	}{
+		{
+			name:         "a ticker goes straight to the route",
+			identifier:   "VOLV-B",
+			wantRequests: []string{"/companies/VOLV-B?"},
+		},
+		{
+			name:         "an ISIN is resolved to an ID after the route 404s",
+			identifier:   "se0000115446",
+			byISIN:       map[string]string{"se0000115446": volvo},
+			wantRequests: []string{"/companies/se0000115446?", "/companies?fields=id%2Cname%2Cticker&isin=se0000115446", "/companies/co1?"},
+		},
+		{
+			name:         "an unknown ISIN keeps the route's 404",
+			identifier:   "SE0000000000",
+			wantRequests: []string{"/companies/SE0000000000?", "/companies?fields=id%2Cname%2Cticker&isin=SE0000000000"},
+			want404:      true,
+		},
+		{
+			name:         "a 404 on an identifier that is no ISIN is not retried",
+			identifier:   "NOPE",
+			wantRequests: []string{"/companies/NOPE?"},
+			want404:      true,
+		},
+		{
+			name:         "an ISIN shared by two companies names both",
+			identifier:   "SE0000115446",
+			byISIN:       map[string]string{"SE0000115446": twoCompanies},
+			wantRequests: []string{"/companies/SE0000115446?", "/companies?fields=id%2Cname%2Cticker&isin=SE0000115446"},
+			wantErr:      "matches more than one company",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var requests []string
+			srv := httptest.NewServer(isinRoutes(t, tt.byISIN, &requests))
+			t.Cleanup(srv.Close)
+			client := api.NewClient("key", api.WithBaseURL(srv.URL))
+
+			var company *api.Company
+			err := withCompany(context.Background(), client, tt.identifier, func(id string) (err error) {
+				company, _, err = client.GetCompany(context.Background(), id)
+				return err
+			})
+
+			if strings.Join(requests, " ") != strings.Join(tt.wantRequests, " ") {
+				t.Errorf("requests = %q, want %q", requests, tt.wantRequests)
+			}
+			switch {
+			case tt.wantErr != "":
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || !strings.Contains(err.Error(), "co9") {
+					t.Errorf("err = %v, want %q naming each company", err, tt.wantErr)
+				}
+			case tt.want404:
+				var apiErr *api.APIError
+				if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusNotFound {
+					t.Errorf("err = %v, want the route's 404", err)
+				}
+			default:
+				if err != nil || company == nil || company.ID != "co1" {
+					t.Errorf("company = %+v, err = %v, want co1", company, err)
+				}
+			}
+		})
+	}
+}
+
+func TestCompaniesGet_ByISIN(t *testing.T) {
+	var requests []string
+	handler := isinRoutes(t, map[string]string{"SE0000115446": `{"companies":[{"id":"co1","name":"AB Volvo","ticker":"VOLV-B"}]}`}, &requests)
+
+	out := runCommandWithArgs(t, companiesGetCmd, handler, "table", []string{"SE0000115446"})
+
+	if !strings.Contains(out, "AB Volvo") || !strings.Contains(out, "VOLV-B · SE0000115446") {
+		t.Errorf("output = %q, want the company the ISIN names", out)
 	}
 }
